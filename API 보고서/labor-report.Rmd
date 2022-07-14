@@ -1,0 +1,921 @@
+---
+title: "고용동향 내부 보고서"
+author: "임현도"
+date: "`r Sys.Date()`"
+output: 
+  word_document:
+    fig_width: 7
+---
+
+```{r include = FALSE, message=FALSE}
+############################################################################################################
+#
+#   주의 사항:
+#          - 본 자동 보고서의 구현을 위해서는 python을 설치해야하며, 가능하면 Anaconda를 설치 후 실행할 것을 권고
+#          - Anaconda에서 제공하는 파이썬 패키지는 기본패키지 및 Numpy와 같은 전통적인 필요 패키지만 있기에 
+#            특정 기능을 목표로 하는 패키지는 추가로 설치가 필요함
+#
+#
+############################################################################################################
+#
+
+# 깔아야하는 파이썬 패키지
+# reticulate::py_install("pytrends") # 구글 트렌드를 스크래핑하기 위한 파이썬 패키지 설치.
+# reticulate::py_install("pandas")
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# knitr::knit_engines$set(python=reticulate::eng_python) # 파이썬 코드 구동을 위한 준비
+```
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+require(plyr) # 데이터 정리의 간편화를 위한 패키지
+require(tidyverse) # 데이터 정리의 간편화를 위한 패키지
+require(data.table) # 데이터 정리의 간편화를 위한 패키지
+require(jsonlite) # fromJSON() 을 사용하기 위한 패키지
+require(httr) # GET() 통하여 받은 데이터의 text화
+require(glue)
+# library(gtrendsR) # 구글 트렌드 접속
+require(scales) # 시계열 레이블링을 위한 패키지
+require(zoo) # time series 데이터 활용
+require(extrafont) # 한글 폰트 추가
+require(ggthemes) # 그래프 테마
+require(future)
+# library(blsAPI) # BLS 데이터 엑세스
+
+library(lubridate)
+#library(rjson)
+loadfonts()
+par(family = "NanumGothic")
+# 
+require(reticulate) # 파이썬 구동 패키지
+# py_install("pytrends")
+# use_python(Sys.which("python"))
+rm(list=ls())
+```
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+# API 키 - 아래는 "임현도"의 통계청 아이디 API키이며, 이후 다른 사람이 사용시 키를 업데이트할 필요가 있음
+api_key <- "[KOSIS API KEY 입력]"
+# 아래의 bls_api_key는 BLS에서 받은 API KEY를 활용
+bls_api_key <- "[BLS API KEY 입력]"
+
+### 엑세스 링크 생성
+start_date <- 201401 # 2014년 1월 1일
+############################################################################################################################################################
+############################################################################################################################################################
+###### 업데이트 시 아래 수치 변경!!!!!!#####################################################################################################################
+latest_date <- 202206 ######################################################################################################################################
+############################################################################################################################################################
+############################################################################################################################################################
+## 엑세스 링크는 아래의 포멧과 같이 처리됨
+# front <- paste0("https://kosis.kr/openapi/Param/statisticsParameterData.do?method=getList&apiKey=",
+#                 api_key,
+#                 "&itmId=") # KOSIS OPENAPI에 "임현도가 데이터를 요청함을 확인
+# middle <- "+&objL1=00+&objL2=&objL3=&objL4=&objL5=&objL6=&objL7=&objL8=&format=json&jsonVD=Y&prdSe=M&startPrdDe=199906&endPrdDe=" # 신청하고자 하는 데이터의 변수들의 세부항목 지정
+# back <- "&loadGubun=1&orgId=101&tblId=DT_1DA9001S" # 데이터명 지정
+# 
+
+# source("report_functions.R")
+source("report_cleaning.R") # 문제가 있을 시 해당 파일을 확인
+```
+
+
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+# start_time <- Sys.time()
+plan(multisession, workers=6)
+#### _데이터_
+## 계절조정 데이터 추출
+main_season %<-% gen_main_season(api_key)
+# main_season <- gen_main_season(api_key)
+
+## 원계열 총괄
+main_nons %<-% gen_main_nons(api_key)
+# main_nons <- gen_main_nons(api_key)
+# gen_report_vecs(main_nons)
+
+## 원계열 성별 데이터
+main_gender %<-% gen_main_gender(api_key)
+# main_gender <- gen_main_gender(api_key)
+
+## 원계열 산업별 엑세스 링크 설정
+# main_ind <- call_main_ind(api_key)
+# 서비스업 세부정리
+main_ser %<-% gen_main_ser(call_main_ind(api_key))
+# main_ser <- gen_main_ser(main_ind)
+# 산업 단순분류로 정리
+main_ind %<-% gen_main_ind(call_main_ind(api_key))
+# main_ind <- gen_main_ind(main_ind)
+
+## 계절조정 산업별
+season_ind %<-% season_ind_cleaning2(season_ind_cleaning(api_key))
+season_ser %<-% season_ser_cleaning(season_ind_cleaning(api_key))
+# season_ind <- season_ind_cleaning(api_key)
+# season_ser <- season_ser_cleaning(season_ind)
+# season_ind <- season_ind_cleaning2(season_ind)
+
+# 종사상지위별 엑세스 링크 지정
+main_rank %<-% gen_main_rank(api_key)
+# main_rank <- gen_main_rank(api_key)
+
+# 종사자규모별 엑세스 링크 지정
+main_size %<-% gen_main_size(api_key)
+# main_size <- gen_main_size(api_key)
+
+# 청년층 부가지표
+main_sub_youth %<-% sub_youth_cleaning()
+# main_sub_youth <- sub_youth_cleaning()
+
+# 전체 부가지표
+main_sub_total %<-% main_sub_total_cleaning()
+# main_sub_total <- main_sub_total_cleaning()
+
+#전체임금총액
+main_wage_total %<-% main_wage_total_cleaning(main_wage_cleaning())
+# main_wage_total <- main_wage_total_cleaning(main_wage_cleaning())
+
+# 상용임금총액
+main_wage_reg %<-% main_wage_reg_cleaning2(main_wage_reg_cleaning())
+# main_wage_reg <- main_wage_reg_cleaning2(main_wage_reg_cleaning())
+
+# 상용정액급여
+base_wage_reg %<-% base_wage_reg_cleaning2(base_wage_reg_cleaning())
+# base_wage_reg <- base_wage_reg_cleaning2(base_wage_reg_cleaning())
+
+# 상용초과급여
+extra_wage_reg %<-% extra_wage_reg_cleaning2(extra_wage_reg_cleaning())
+# extra_wage_reg <- extra_wage_reg_cleaning2(extra_wage_reg_cleaning())
+
+# 임시일용임금총액
+main_wage_tmp %<-% main_wage_tmp_cleaning2(main_wage_tmp_cleaning())
+# main_wage_tmp <- main_wage_tmp_cleaning2(main_wage_tmp_cleaning())
+
+main_season;main_nons;main_gender;main_ind;main_ser;season_ind;season_ind;main_rank;main_size;main_sub_youth;main_sub_total;main_wage_total;main_wage_reg;
+base_wage_reg;extra_wage_reg;main_wage_tmp
+# end_time <- Sys.time()
+
+```
+
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+# 보고서 내용을 위한 DB 생성
+report <- c(round(main_nons[year==latest_date%/%100&month==latest_date%%100]$emp_yr_diff/10,1), # 전년동월대비 취업자 수
+            round(main_nons[year==latest_date%/%100&month==latest_date%%100]$emp_mth_diff/10,1), # 전월대비 취업자 수
+            round(main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="상용근로자"]$emp_yr_diff/10,1), # 전년동월대비 상용근로자 수
+            round(main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="상용근로자"]$emp_mth_diff/10,1), # 전월대비 사용근로자 수
+            round(main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="일용·임시근로자"]$emp_yr_diff/10,1), # 전년동월대비 일용·임시근로자 수
+            round(main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="일용·임시근로자"]$emp_mth_diff/10,1), # 전월대비 일용·임시근로자 수
+            round((main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="고용주"]$emp_yr_diff +
+               main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="개인자영자"]$emp_yr_diff)/10,1), # 전년동월대비 자영업자 수
+            round((main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="고용주"]$emp_mth_diff +
+               main_rank[year==latest_date%/%100&month==latest_date%%100&ranking=="개인자영자"]$emp_mth_diff)/10,1), # 전월대비 자영업자 수
+            round(main_ind[year==latest_date%/%100&month==latest_date%%100&ind=="제조업"]$emp_yr_diff/10,1), # 전년동월대비 제조업 취업자 수
+            round(main_ind[year==latest_date%/%100&month==latest_date%%100&ind=="서비스업"]$emp_yr_diff/10,1), # 전년동월대비 서비스업 취업자 수
+            round(main_ind[year==latest_date%/%100&month==latest_date%%100&ind=="건설업"]$emp_yr_diff/10,1), # 전년동월대비 건설업 취업자 수
+            round(main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$emprate,1),
+            (main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$unemprate - 
+              main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$lag.unempr.month),
+            main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$unemprate,
+            (main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$actrate - 
+              main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$lag.actr.month),
+            main_season[year==latest_date%/%100&month==latest_date%%100&gender=="계"]$actrate,
+            (main_nons[year==latest_date%/%100&month==latest_date%%100]$emprate - 
+              main_nons[year==latest_date%/%100&month==latest_date%%100]$lag.empr.yr),
+            main_nons[year==latest_date%/%100&month==latest_date%%100]$emprate,
+            (main_nons[year==latest_date%/%100&month==latest_date%%100]$unemprate - 
+              main_nons[year==latest_date%/%100&month==latest_date%%100]$lag.unempr.yr),
+            main_nons[year==latest_date%/%100&month==latest_date%%100]$unemprate,
+            main_wage_reg[dim(main_wage_reg)[1],]$wage_mth_diff_rate,
+            main_wage_reg[dim(main_wage_reg)[1],]$wage_yr_diff_rate,
+            main_wage_tmp[dim(main_wage_tmp)[1],]$wage_mth_diff_rate,
+            main_wage_tmp[dim(main_wage_tmp)[1],]$wage_yr_diff_rate)
+# report;length(report)
+
+```
+
+
+# 고용시장 현황
+
+- `r {max(main_nons[main_nons$year==max(main_nons$year)]$month)}`월 취업자 수는 전년동월대비 `r {abs(report[1])}`만명 `r {ifelse(report[1]>0,"증가","감소")}`하였으며, 전월대비 `r {abs(report[2])}`만명 `r {ifelse(report[2]>0,"증가","감소")}`
+  + 종사상 지위별로는 상용직이 전년동월대비 `r {abs(report[3])}`만명 `r {ifelse(report[3]>0,"증가","감소")}`, 전월대비 `r {abs(report[4])}`만명 `r {ifelse(report[4]>0,"증가","감소")}`하였으며, 임시·일용직은 전년동월대비 `r {abs(report[5])}`만명 `r {ifelse(report[5]>0,"증가","감소")}`, 전월대비 `r {abs(report[6])}`만명 `r {ifelse(report[6]>0,"증가","감소")}`하였고, 자영업은 전년동월대비 `r {abs(report[7])}`만명 `r {ifelse(report[7]>0,"증가","감소")}`, 전월대비 `r {abs(report[8])}`만명 `r {ifelse(report[8]>0,"증가","감소")}`
+  + 산업별로는 제조업에서 전년동월대비 `r {abs(report[9])}`만명 `r {ifelse(report[9]>0,"증가","감소")}`하였으며, 서비스업에서 `r {abs(report[10])}`만명 `r {ifelse(report[10]>0,"증가","감소")}`하였고, 건설업에서 `r {abs(report[11])}`만명 `r {ifelse(report[11]>0,"증가","감소")}`
+
+- 계절조정 고용률(15세 이상)은 `r {report[12]}`%를 기록하였고, 계절조정 실업률은 전월보다 `r {abs(report[13])}`%p `r {ifelse(report[13]>0,"증가","감소")}`한 `r {report[14]}`%를 기록
+  + 계절조정 경제활동참가율은 전월보다 `r {abs(report[15])}`%p `r {ifelse(report[15]>0,"증가","감소")}`한 `r {report[16]}`%를 기록
+  + 한편, 원계열 기준 고용률은 전년동월대비 `r {abs(report[17])}`%p `r {ifelse(report[17]>0,"증가","감소")}`한 `r {report[18]}`%를, 실업률은 전년동월대비 `r {abs(report[19])}`%p `r {ifelse(report[19]>0,"증가","감소")}`한 `r {report[20]}`%를 기록
+- `r {max(main_wage_reg[main_wage_reg$year==max(main_wage_reg$year)]$month)}`월 상용근로자 1인 이상 사업체에서 상용근로자의 전체임금은 전년동월대비 `r {abs(report[22])}`% `r {ifelse(report[22]>0,"증가","감소")}`하였으며, 임시·일용 근로자의 전체 임금은 전년동월대비 `r {abs(report[24])}`% `r {ifelse(report[24]>0,"증가","감소")}`
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+# 그래프 가동 함수 call
+source("plots.R")
+```
+
+```{r echo=FALSE,warning=FALSE}
+# plot 1
+# 전체 전년동월대비 취업자 수 및 고용률
+plot_1()
+```
+
+
+```{r echo=FALSE,warning=FALSE}
+
+# 산업별 취업자
+# plot 2 - 1 
+# 산업별 취업자 수 그래프
+plot_2_1()
+
+# plot 2-2
+# 산업별 전년동월대비 취업자
+plot_2_2()
+
+# plot 2-3
+# 서비스업별 취업자 수 그래프
+plot_2_3()
+
+# plot 2-4
+# 전년동월대비 서비스업별 취업자 그래프
+plot_2_4()
+```
+
+
+```{r echo=FALSE,warning=FALSE}
+### 종사상지위별 ###
+# plot 3-1
+# 종사상지위별 취업자 수
+plot_3_1()
+
+# plot 3-2
+# 전년동월대비 종사상지위별 취업자
+plot_3_2()
+```
+
+```{r echo=FALSE,warning=FALSE}
+### 종사자규모별 ###
+# plot 4-1
+# 종사자규모별 취업자 수
+plot_4_1()
+
+# plot 4-2
+# 전년동월대비 종사자규모별 취업자
+plot_4_2()
+``` 
+ 
+
+
+```{r echo=FALSE,warning=FALSE}
+ageg <- unique(main_gender$ageg)
+### 성별X연령별 ###
+# plot 5-1
+# 남성의 전년동월대비 취업자 수 및 고용률
+plot_5_1()
+
+# plot 5-2
+# 여성의 전년동월대비 취업자 수 및 고용률
+plot_5_2()
+
+# plot 5-11
+# 남녀 고용률 비교
+plot_5_11()
+
+# plot 5-3
+# 남성 연령별 취업자 수
+plot_5_3()
+# plot 5-4
+# 전년동월대비 남성 연령별 취업자
+plot_5_4()
+# plot 5-5
+# 여성 연령별 취업자 수
+plot_5_5()
+# plot 5-6
+# 전년동월대비 여성 연령별 취업자
+plot_5_6()
+
+# plot 5-7
+# 남성 연령별 고용률
+plot_5_7()
+# plot 5-8
+# 전년동월대비 남성 연령별 고용률
+plot_5_8()
+
+# plot 5-9
+# 여성 연령별 고용률
+plot_5_9()
+# plot 5-10
+# 전년동월대비 여성 연령별 고용률
+plot_5_10()
+
+```
+
+```{r echo=FALSE,warning=FALSE}
+### 고용보조지표 ###
+# plot 6 - 1
+plot_6_1()
+```
+```{r echo=FALSE,warning=FALSE}
+### 사업체노동력조사 임금 데이터 ###
+# plot 7-1
+#전체임금총액
+plot_7_1()
+
+# plot 7-2
+# 상용근로자 및 임시일용근로자 임금총액
+plot_7_2()
+
+# plot 7-3
+# 상용근로자 정액급여 및 초과급여
+plot_7_3()
+```
+
+
+출처: KOSIS, 경제활동인구조사 & 사업체노동력조사
+
+
+# 지역별고용조사 결과
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+
+
+```
+
+# 구직급여 분석 결과
+
+```{r echo=FALSE,warning=FALSE,include=FALSE,message=FALSE}
+### 엑세스 링크 생성
+start_date <- 201501
+# latest_date <- 202204
+front <- paste0("https://kosis.kr/openapi/Param/statisticsParameterData.do?method=getList&apiKey=",
+                api_key,
+                "&itmId=T00")
+middle <- "+&objL1=DATA&objL2=&objL3=&objL4=&objL5=&objL6=&objL7=&objL8=&format=json&jsonVD=Y&prdSe=M&startPrdDe=201501&endPrdDe="
+back <- "&loadGubun=1&orgId=118&tblId=DT_11844N_7374_Z"
+
+unemp_apply <- paste0(front,1,middle,latest_date-1,back)
+unemp_recipient <- paste0(front,2,middle,latest_date-1,back)
+unemp_benefit <- paste0(front,3,middle,latest_date-1,back)
+
+main_unin <- api_call(unemp_apply)
+main_unin <- rbind(main_unin,api_call(unemp_recipient))
+main_unin <- rbind(main_unin,api_call(unemp_benefit))
+main_unin <- initial_cleaning(main_unin,level=0)
+names(main_unin)[4:6] <- c("apply","benefit","recipient")
+```
+
+```{r echo=FALSE}
+### 8 구직급여 ###
+# plot 8-1
+plot_8_1()
+```
+
+
+# 구글 트렌드 
+
+## '실업' 키워드
+
+```{python echo=FALSE}
+from pytrends.request import TrendReq # 구글 트렌드를 읽어들일 패키지
+import pandas as pd # DataFrame화 시킬 패키지
+```
+```{python echo=FALSE}
+keyword = "실업" # 키워드
+pytrend = TrendReq(timeout=25) # 구글 트렌드 검색을 위해 세팅
+
+pytrend.build_payload(kw_list=[keyword],timeframe='today 12-m') # 키워드 입력 및 검색 기간 적용
+tmp = pytrend.interest_over_time() # 주별 상대빈도 데이터
+tmp=tmp.rename(columns = {'실업':'unemp'}) # R에서 사용하기 위해 변수명을 영어로 변환
+```
+```{r echo=FALSE}
+tmp <- py$tmp # 파이썬환경의 데이터를 R로 옮김(파이썬 코드를 돌릴때 모든 파이썬 데이터는 "py" 환경에 저장됨)
+tmp[,"date"] <- rownames(tmp) # rowname으로 저장된 날짜 데이터를 변수로 변환
+tmp %>% # 주별 검색량 시각화
+  ggplot(aes(x=as.Date(date),y=unemp)) +
+  geom_bar(stat = "identity") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  labs(y = "검색량",
+       x = "",
+       title = "지난 1년간 '실업'키워드 주별 검색량",
+       caption = "출처: 구글 트렌드") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{python echo=FALSE}
+pytrend = TrendReq(timeout=25)
+
+pytrend.build_payload(kw_list=[keyword],timeframe='today 5-y')
+tmp = pytrend.interest_over_time()
+tmp=tmp.rename(columns = {'실업':'unemp'})
+```
+```{r echo=FALSE}
+tmp <- py$tmp
+tmp[,"date"] <- rownames(tmp)
+tmp %>%
+  ggplot(aes(x=as.Date(date),y=unemp)) +
+  geom_bar(stat = "identity") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  labs(y = "검색량",
+       x = "",
+       title = "지난 5년간 '실업'키워드 주별 검색량",
+       caption = "출처: 구글 트렌드") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{python echo=FALSE}
+from pytrends.request import TrendReq
+import pandas as pd
+
+keyword = "실업"
+pytrend = TrendReq(timeout=25)
+
+pytrend.build_payload(kw_list=[keyword],timeframe='all')
+tmp = pytrend.interest_over_time()
+tmp=tmp.rename(columns = {'실업':'unemp'})
+```
+```{r echo=FALSE}
+tmp <- py$tmp
+tmp[,"date"] <- rownames(tmp)
+tmp %>%
+  ggplot(aes(x=as.Date(date),y=unemp)) +
+  geom_bar(stat = "identity") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 year") +
+  labs(y = "검색량",
+       x = "",
+       title = "전체기간 '실업'키워드 주별 검색량",
+       caption = "출처: 구글 트렌드") +
+  theme_stata(scheme = "s1mono")
+```
+
+\newpage
+```{python echo=FALSE}
+pytrend = TrendReq(timeout=25)
+
+pytrend.build_payload(kw_list=[keyword],timeframe='today 12-m')
+tmp = pytrend.related_queries()['실업']['top'].head(10)
+tmp1 = tmp.rename(columns = {'query':'1년','value':'상대 빈도'})
+```
+```{python echo=FALSE}
+pytrend = TrendReq(timeout=25)
+
+pytrend.build_payload(kw_list=[keyword],timeframe='today 5-y')
+```
+```{python echo=FALSE}
+tmp = pytrend.related_queries()['실업']['top'].head(10)
+tmp5 = tmp.rename(columns = {'query':'5년','value':'상대 빈도'})
+```
+
+```{r echo=FALSE}
+tmp1 <- py$tmp1
+tmp5 <- py$tmp5
+knitr::kable(cbind(
+  (tmp1),
+  (tmp5)), caption = "지난 1년 또는 5년간 '실업' 관련 검색어 상대 빈도",valign="t"
+             )
+```
+
+\newpage
+```{python echo=FALSE}
+
+keyword = "실업"
+pytrend = TrendReq(timeout=25)
+
+pytrend.build_payload(kw_list=[keyword], timeframe='today 12-m', geo = 'KR')
+tmp = pytrend.interest_by_region()
+tmp1 = tmp.rename(columns = {'실업':'1년'})
+
+pytrend.build_payload(kw_list=[keyword], timeframe='today 5-y', geo = 'KR')
+tmp = pytrend.interest_by_region()
+tmp5 = tmp.rename(columns = {'실업':'5년'})
+
+tmp1 = tmp1.sort_values(by=['1년'], ascending = False)
+tmp5 = tmp5.sort_values(by=['5년'], ascending = False)
+```
+
+```{r echo=FALSE}
+tmp1 <- py$tmp1
+tmp5 <- py$tmp5
+tmp1[,"지역명"] <- rownames(tmp1)
+tmp5[,"지역명"] <- rownames(tmp5)
+
+
+knitr::kable(cbind(
+  remove_rownames(tmp1),
+  remove_rownames(tmp5)), caption = "지난 1년 또는 5년간 '실업' 관련 검색어 상대 빈도",valign="t"
+             )
+```
+
+
+\newpage
+
+# 네이버 키워드 연령X성별 분석
+## '실업' 키워드
+```{python echo=FALSE,warning = FALSE}
+import os
+import sys
+import datetime
+import urllib.request
+import pandas as pd
+import json
+client_id = "[네이버 API 아이디]" # API 아이디
+client_secret = "[네이버 API 비밀번호]" # API 비밀번호
+from naver_api import naver_call_agegroup
+
+main = naver_call_agegroup(client_id,client_secret,"실업","실업",365,"date")
+main5 = naver_call_agegroup(client_id,client_secret,"실업","실업",365*5,"week")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 남성의 '실업' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 여성의 '실업' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+```
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main5
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 남성의 '실업' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 여성의 '실업' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+```
+
+## '채용' 키워드
+```{python echo=FALSE,warning = FALSE}
+import os
+import sys
+import datetime
+import urllib.request
+import pandas as pd
+import json
+from naver_api import naver_call_agegroup
+
+main = naver_call_agegroup(client_id,client_secret,"채용","채용",365,"date")
+main5 = naver_call_agegroup(client_id,client_secret,"채용","채용",365*5,"week")
+```
+
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 남성의 '채용' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 여성의 '채용' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+```
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main5
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 남성의 '채용' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 여성의 '채용' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+```
+
+## '이직' 키워드
+
+```{python echo=FALSE,warning = FALSE}
+import os
+import sys
+import datetime
+import urllib.request
+import pandas as pd
+import json
+from naver_api import naver_call_agegroup
+
+main = naver_call_agegroup(client_id,client_secret,"이직","이직",365,"date")
+main5 = naver_call_agegroup(client_id,client_secret,"이직","이직",365*5,"week")
+```
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 남성의 '이직' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "각 연령별 여성의 '이직' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "1 month") +
+  theme_stata(scheme = "s1mono")
+```
+```{r echo=FALSE, warning=FALSE}
+naver <- py$main5
+naver <- melt(setDT(naver),
+              id.vars = c("period"),
+              variable.name = "group")
+naver <- naver[,gender := ifelse(grepl("남성",group),1,ifelse(grepl("여성",group),2,NA))] %>% 
+  .[,ageg:=gsub("남성","",gsub("여성","",group))] %>% 
+  .[,period := as.Date(period)]
+
+naver[gender==1 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 남성의 '이직' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+
+```
+```{r echo=FALSE, warning=FALSE}
+naver[gender==2 & ageg %in% c("19-24세","25-29세","30-34세","35-39세")] %>% ggplot(aes(x = period, y = value, group = ageg, color = ageg)) +
+  geom_line(size=1) +
+  xlab("날짜") +
+  ylab("%") +
+  labs(title = "지난 5년간 각 연령별 여성의 '이직' 검색 상대빈도",
+       caption = "출처: 네이버 데이터랩",
+       group = "연령별",
+       color = "연령별") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme_stata(scheme = "s1mono")
+```
+
+# 미국 고용현황
+```{r echo=FALSE, warning = FALSE}
+payload <- list(
+'seriesid'=c("CES0000000001", # All employees
+             "CES0500000003", # average Hourly Earning
+             "LNU02000036", # EMPLOYMENT 20-24 YRS
+             "LNU02024932", # EMPLOYMENT 25-29 YRS
+             "LNU02024933", # EMPLOYMENT 30-34 YRS
+             "LNU02024934", # EMPLOYMENT 35-39 YRS
+             "LNU02024935", # EMPLOYMENT 40-44 YRS
+             "LNU02024936", # EMPLOYMENT 45-49 YRS
+             "LNU02024937", # EMPLOYMENT 50-54 YRS
+             "LNU02000094", # EMPLOYMENT 55-59 YRS
+             "LNU02000096", # EMPLOYMENT 60-64 YRS
+             "LNU02000097", # EMPLOYMENT 65 YRS OR OVER
+             "LEU0252887100", # EMPLOYED-FULL TIME MEDIAN USUAL WEEKLY EARNING 20-24 YRS, QUARTERLY
+             "LEU0252888500", #MEDIAN USUAL WEEKLY EARNING 25-34 YRS, QUARTERLY
+             "LEU0252889100", #MEDIAN USUAL WEEKLY EARNING 35-44 YRS, QUARTERLY
+             "LEU0252889700", #MEDIAN USUAL WEEKLY EARNING 45-54 YRS, QUARTERLY
+             "LEU0252890900", #MEDIAN USUAL WEEKLY EARNING 55-64 YRS, QUARTERLY
+             "LEU0252891500" #MEDIAN USUAL WEEKLY EARNING 65 YRS OR OVER, QUARTERLY
+             ),
+'startyear'=2015,
+'endyear'=2022,
+'catalog'=FALSE,
+'calculations'=TRUE,
+'annualaverage'=TRUE,
+'registrationKey'= bls_api_key)
+response <- blsAPI(payload,2)
+json <- rjson::fromJSON(response)
+
+apiDF <- function(data){
+  df <- data.frame(year = character(),
+                   period = character(),
+                   periodName = character(),
+                   value = character(),
+                   stringsAsFactors = FALSE)
+  i <- 0
+  for(d in data){
+    i <- i + 1
+    df[i,] <- unlist(d)
+  }
+  return(df)
+}
+# unemployed.df <- apiDF(json$Results$series[[1]]$data)
+# labor.force.df <- apiDF(json$Results$series[[2]]$data)
+
+employed.df <- apiDF(json$Results$series[[1]]$data)
+employed.df[,4] <- as.numeric(employed.df[,4])
+names(employed.df)[4] <- 'employed'
+employed.df$date <- lubridate::mdy(paste0(employed.df$periodName,"01",employed.df$year))
+employed.df <- employed.df %>% filter(!is.na(employed))
+
+
+earning.df <- apiDF(json$Results$series[[2]]$data)
+earning.df[,4] <- as.numeric(earning.df[,4])
+names(earning.df)[4] <- 'earning'
+earning.df$date <- lubridate::mdy(paste0(earning.df$periodName,"01",earning.df$year))
+earning.df <- earning.df %>% filter(!is.na(earning))
+
+age.employed.df <- apiDF(json$Results$series[[3]]$data)
+age.employed.df <- age.employed.df %>% mutate(ageg = 1)
+for(i in 4:12){
+  age.employed.df <- rbind(age.employed.df,apiDF(json$Results$series[[i]]$data) %>% mutate(ageg = i-2))
+}
+age.employed.df <- age.employed.df %>% filter(value!="true") %>% mutate(value = as.numeric(value)) %>% 
+  mutate(date = lubridate::mdy(paste0(periodName,"01",year)))
+age.employed.df <- age.employed.df %>% filter(periodName!="Annual")
+age.employed.df <- age.employed.df %>% mutate(ageg = factor(ageg,
+                                                            levels = 1:10,
+                                                            labels = c(paste0(seq(20,60,5),"-",seq(24,64,5)),"65 or over")))
+age.earnings.df <- apiDF(json$Results$series[[13]]$data)
+age.earnings.df <- age.earnings.df %>% mutate(ageg = 1)
+for(i in 14:18){
+  age.earnings.df <- rbind(age.earnings.df,apiDF(json$Results$series[[i]]$data) %>% mutate(ageg = i-12))
+}
+age.earnings.df <- age.earnings.df %>% filter(value!="true"&periodName!="Annual")
+age.earnings.df <- age.earnings.df %>% mutate(ageg = factor(ageg,
+                                                            levels = 1:6,
+                                                            labels = c("20-24",paste0(seq(25,55,10),"-",seq(34,64,10)),"65 or over")))
+age.earnings.df <- age.earnings.df %>% mutate(period = gsub("0","",period)) %>% mutate(date = as.yearqtr(paste0(year,"-",period),format="%Y-Q%q"))
+
+# seq(20,60,5);seq(24,64,5)
+```
+```{r echo=FALSE, warning=FALSE}
+employed.df %>% ggplot(aes(x=date,y=employed/10)) +
+  geom_line(size=1) +
+  labs(x = "날짜",
+       y = "만명",
+       title = "미국 고용자 수(Total Nonfarm)",
+       caption = "자료: BLS, National Employment, Hours, and Earnings") +
+  theme_stata(scheme = "s1mono") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme(axis.text.y = element_text(angle = 0))
+```
+```{r echo=FALSE, warning=FALSE}
+earning.df %>% ggplot(aes(x=date,y=earning)) +
+  geom_line(size=1) +
+  labs(x = "날짜",
+       y = "달러",
+       title = "미국의 시간당 평균임금 (Total Nonfarm Private)",
+       caption = "자료: BLS, National Employment, Hours, and Earnings") +
+  theme_stata(scheme = "s1mono") +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme(axis.text.y = element_text(angle = 0))
+```
+```{r echo=FALSE}
+age.employed.df %>% filter(!is.na(value)) %>% mutate(emp = value/10) %>% ggplot(aes(x=date,y=emp,group = ageg, color = ageg, lty = ageg)) +
+  geom_line(size=1) +
+  labs(x = "날짜",
+       y = "만명",
+       title = "미국 연령별 고용자 수(Not Seasonally Adjusted)",
+       caption = "자료: BLS,Labor Force Statistics from the Current Population Survey") +
+  theme_stata(scheme = "s1mono") +
+  scale_color_manual(values = c(rep("black",2),rep("red",2),rep("blue",2),rep("darkgreen",2),rep("grey50",2))) +
+  scale_linetype_manual(values = c(rep(c(1,2),5))) +
+  scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme(axis.text.y = element_text(angle = 0),
+        legend.title = element_blank())
+```
+
+```{r echo=FALSE}
+age.earnings.df %>% mutate(value = as.numeric(value)) %>% 
+  ggplot(aes(x=date,y=value,group = ageg, color = ageg, lty = ageg)) +
+  geom_line(size=1) +
+  labs(x = "날짜",
+       y = "달러",
+       title = "미국 주별 중간임금(Not Seasonally Adjusted, Full-employed)",
+       caption = "자료: BLS,Labor Force Statistics from the Current Population Survey") +
+  theme_stata(scheme = "s1mono") +
+  scale_color_manual(values = c(rep("black",2),rep("red",2),rep("blue",2))) +
+  scale_linetype_manual(values = c(rep(c(1,2),3))) +
+  scale_x_yearqtr(format = "%Y\nQ%q",n=8) +
+  # scale_x_date(date_labels = "%m\n%Y",breaks = "6 month") +
+  theme(axis.text.y = element_text(angle = 0),
+        legend.title = element_blank())
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+```{r echo=FALSE}
+
+```
+
+
