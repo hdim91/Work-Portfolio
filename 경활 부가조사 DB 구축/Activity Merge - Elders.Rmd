@@ -1,0 +1,541 @@
+---
+title: "Activity Merge - Elders"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(plyr)
+library(tidyverse)
+library(readxl)
+library(readr)
+library(haven)
+library(xlsx)
+library(psych)
+library(zoo)
+library(Hmisc)
+rm(list=ls())
+```
+
+
+```{r}
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\고령층 & 청년층 경활\\고령층 데이터")
+temp <- list.files(pattern = "txt")
+temp_xls <- list.files(pattern="xls")
+temp;temp_xls
+
+split_nm <- c()
+for(i in 2005:2021){
+  split_nm <- c(split_nm, paste0("split",i))
+  assign(split_nm[i-2004],read_excel(temp_xls[1],sheet = as.character(i)))
+}
+split_list <- lapply(ls(pattern="split[0-9]"),function(x) get(x))
+length(split_list)
+for(i in 1:length(split_list)){
+  split_list[[i]]["year"] <- 2004+i
+  split_list[[i]] <- split_list[[i]][c("항목명","시작위치","길이","year")]
+}
+
+change_type <- function(DF){
+  DF[,"길이"] <- as.numeric(unlist(DF[,c("길이")]))
+  DF
+}
+
+split_list <- lapply(split_list, change_type)
+
+split_df <- split_list[[1]]
+for(i in 2:length(split_list)){
+  split_df <- rbind(split_df, split_list[[i]])
+}
+rm(list=ls(pattern="split[0-9]"))
+
+```
+```{r}
+table(act2011$이직이유)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+dfnames <- c()
+for(i in 2005:2021){
+  dfnames <- c(dfnames,paste0("act",i))
+}
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\고령층 & 청년층 경활\\고령층 데이터")
+for(i in 1:length(temp)){
+  assign(paste0("act",2004+i),
+         read_fwf(temp[i],
+                  col_positions = fwf_widths(unlist(split_df[split_df$year==i+2004,
+                                                             c("길이")]))))
+}
+
+for(i in 1:length(dfnames)){
+  rslt <- get(dfnames[i])
+  n_list <- unlist(split_df[split_df$year==i+2004,c("항목명")])
+  n_list <- gsub("[(]","_",n_list)
+  n_list <- gsub("[)]","",n_list)
+  n_list <- gsub(" ","",n_list)
+  n_list <- gsub("/","",n_list)
+  n_list <- gsub("[0-9]{2}[-][0-9]","",n_list)
+  n_list <- gsub("[0-9]{1}[-][0-9]","",n_list)
+  n_list <- gsub("1주","일주",n_list)
+  n_list <- gsub("1개월","일개월",n_list)
+  n_list <- gsub(",","",n_list)
+  n_list <- gsub("[?]","",n_list)
+  n_list <- gsub("^36미만","평소36미만",n_list)
+  n_list <- gsub("^4주간","지난4주간",n_list)
+  n_list <- gsub("출생년_" , "출생년도_" ,n_list)
+  n_list <- gsub("_yyyy","",n_list)
+  n_list <- gsub("_YYYY","",n_list)
+  n_list <- gsub("[.]" , "" , n_list)
+  n_list <- gsub("^[0-9]" , "" ,n_list)
+  n_list <- gsub("^[0-9]","",n_list)
+  n_list <- gsub("weight","Weight",n_list)
+  n_list <- gsub("승수","가중치",n_list)
+  n_list <- gsub("가중치_Weight","가중치",n_list)
+  n_list <- gsub("교육정도_계열","계열",n_list)
+  n_list <- gsub("수학여부_계열","계열",n_list)
+  n_list <- gsub("교육정도_수학여부","수학여부",n_list)
+  n_list <- gsub("경제활동상태구분항목","경제활동상태구분",n_list)
+  n_list <- gsub("고용시근로기간을정했나_정하였다면기간은","고용계약기간",n_list)
+  n_list <- gsub("근로기간이2인경우","고용계약기간이2인경우",n_list)
+  n_list <- gsub("총실제취업시간","총취업시간",n_list)
+  n_list <- gsub("지난일주간활동상태","활동상태",n_list)
+  n_list <- gsub("지난4주내구직여부_취업자여부판단항목","지난4주간구직여부",n_list)
+  n_list <- gsub("취업가능성_실업판단항목" , "취업가능성_실업" ,n_list )
+  n_list <- gsub( "취업가능성유무_실업자여부판단항목" , 
+                  "취업가능성_실업" ,  n_list )
+  n_list <- gsub("가구주와의관계","가구주관계",n_list)
+  n_list <- gsub("차개정","차",n_list)
+  n_list <- gsub("고용계약기간여부","고용계약여부",n_list)
+  n_list <- gsub("취직가능성유무", "취직가능성유무_비경활" , n_list)
+  n_list <- gsub("취업가능성유무","취직가능성유무_비경활",n_list)
+  n_list <- gsub("구직의사유무","취업희망여부",n_list)
+  n_list <- gsub("지난일주간취업여부","취업여부",n_list)
+  n_list <- gsub("지난주취업여부","취업여부",n_list)
+  n_list <- gsub("실제취업시간구분" , "취업구분" ,  n_list)
+  n_list <- gsub("일주간구직여부_취업판단항목","일주간구직여부",n_list)
+  n_list <- gsub("직장을구하지않는이유","직장을구하지않은이유",n_list)
+  n_list <- gsub("추가취업유무","추가취업및전직희망",n_list)
+  n_list <- gsub("지난4주내구직여부","지난4주간구직여부",n_list)
+  n_list <- gsub("^구직가능성" , "취업가능성_실업" ,  n_list)
+  n_list <- gsub("주된일_주업실제취업시간","주업시간",n_list)
+  n_list <- gsub("직장시작시기_연월","직장시작시기",n_list)
+  
+  
+  
+  # 이 위는 노터치!
+  n_list <- gsub("최장근속기간-년월","최장근속기간",n_list)
+  n_list <- gsub("최장근속기간-년","최장근속기간",n_list)
+  # n_list <- gsub("이직시기_만나이","이직시기",n_list)
+  n_list <- gsub("일을그만둔시기","이직시기_만나이",n_list)
+  n_list <- gsub("일을그만둔주된이유" , "이직이유" ,  n_list)
+  n_list <- gsub("지난1년간구직경로_1순위","지난1년간구직경로",n_list)
+  n_list <- gsub("^주된이유","계속근무희망주된이유",n_list)
+  n_list <- gsub("_1주된이유","계속근무희망주된이유",n_list)
+  n_list <- gsub("그만둘당시일의종류" , "이직이전일의종류" ,  n_list)
+  n_list <- gsub("_2근로희망나이","근로희망나이",n_list)
+  n_list <- gsub("그만둘당시근로형태" , "이직시근로형태" ,  n_list)
+  
+  
+  names(rslt) <- n_list
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+names(act2013)[44] <- "고용계약기간"
+names(act2014)[43] <- "고용계약여부"
+names(act2014)[23] <- "지난4주내추가취업구직여부"
+names(act2014)[36] <- "전직시기"
+
+for(i in 1:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(
+    만나이 = as.numeric(만나이),
+                             가중치 = as.numeric(가중치),
+    가중치 = 가중치/1000) %>% filter(만나이<80&만나이>54)
+  assign(dfnames[i],as.data.frame(rslt))
+}
+```
+```{r}
+merge_names <- list()
+for(i in 1:length(dfnames)){
+  merge_names[i] <- list(names(get(dfnames[i])))
+}
+
+# merge_names
+# grepl_ <- function(DF){DF[grepl("계속",DF)]};lapply(merge_names,grepl_)
+grepl_ <- function(DF){DF[grepl("이직",DF)]};lapply(merge_names,grepl_)
+```
+
+```{r}
+grepl_ <- function(DF){DF[grepl("산업",DF)]};lapply(merge_names,grepl_)
+
+# unique values 확인
+# 아래 명령어 사용방법: grepl_을 통해 각 년도에 unique 값들이 존재하는지 확인 후 아래에 time range를 설정할 것
+ulist <- list()
+for(i in c(6:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% select(이직이유))
+  ulist[[i]] <- unique(rslt)
+}
+ulist
+
+# 각 년도별 tabulation
+# 아래 명령어 사용방법: grepl_을 통해 각 년도에 unique 값들이 존재하는지 확인 후 아래에 time range를 설정할 것
+tlist <- list()
+for(i in c(1:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% #filter(만나이>64) %>% 
+                   select(경제활동상태))
+  tlist[[i]] <- table(rslt)
+}
+tlist
+
+```
+
+```{r}
+#####################
+##### 고정 변수 #####
+#####################
+
+# 고용계약기간
+for(i in 2:3){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(고용계약기간= 고용계약기간*10,
+                          고용계약기간 = ifelse(고용계약기간==10,1, #1개월 미만
+                                        ifelse(고용계약기간==20,8, # 1개월 이상~ 1년미만
+                                        ifelse(고용계약기간==30,4, #1년
+                                        ifelse(고용계약기간==40&조사년월%%100<7,9, # 1년초과~3년이하
+                                        ifelse(고용계약기간==50&조사년월%%100<7,7, # 3년초과
+                                        ifelse(고용계약기간==40&조사년월%%100>6 , 10 , # 1년초과~2년이하 - 2007년 7월~12월
+                                        ifelse(고용계약기간==50&조사년월%%100>6,11,0)))))))) # 2년초과
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 4:7){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(고용계약기간 = as.numeric(고용계약기간),
+                                고용계약기간 = 고용계약기간 * 10,
+                                고용계약기간 = ifelse(고용계약기간==10,1,
+                                                      ifelse(고용계약기간==20,8,
+                                                      ifelse(고용계약기간>20 , 고용계약기간/10+1 , 0))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 8:10){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(고용계약기간 = 고용계약기간*10,
+                                고용계약기간 = ifelse(고용계약기간==10,1,
+                                                      ifelse(고용계약기간==20&고용계약기간이2인경우==1,2,
+                                                      ifelse(고용계약기간==20&고용계약기간이2인경우==2,3,
+                                                      ifelse(고용계약기간>20,고용계약기간/10+1,0)))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+
+#######################
+##### 고령층 변수 #####
+#######################
+
+# 지난1년간비구직사유
+act2005 <- act2005 %>% mutate(지난1년간비구직사유 = ifelse(지난1년간비구직사유==7,8,지난1년간비구직사유))
+
+# 계속근로희망여부 & 계속근무희망주된이유
+for(i in 1:10){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(계속근무희망주된이유=ifelse(계속근로희망여부<7,계속근로희망여부,0),
+                                    계속근로희망여부 = ifelse(계속근로희망여부<7,1,2))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 희망임금수준
+act2005 <- act2005 %>% mutate(희망임금수준 = 희망임금수준*10,
+                              희망임금수준 = ifelse(희망임금수준==20,3, # 10: 50만원 미만 
+                                                    ifelse(희망임금수준==30,4, # 40: 150~300만원 이상
+                                                                 ifelse(희망임금수준==50,8,희망임금수준)))) 
+for(i in 2:12){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(희망임금수준 = 희망임금수준*10,
+                                희망임금수준 = ifelse(희망임금수준>0&희망임금수준<=40,희망임금수준/10,
+                                                      ifelse(희망임금수준==60,8,희망임금수준))) # 50: 150~300만원 미만
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 근로희망나이
+for(i in 7:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(근로희망나이=as.numeric(근로희망나이))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 월평균수령액
+for(i in 4:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(월평균수령액=as.numeric(월평균수령액))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+########### 시계열 단절
+# 최장근속기간
+for(i in c(1:9)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(longest5579 = as.numeric(최장근속기간),
+                          longest5579 = ifelse(longest5579%%100>6,longest5579%/%100+1,longest5579%/%100),
+                          longest5579 = ifelse(경제활동상태==3,NA,longest5579),
+                          longest5564 = ifelse(만나이>=55&만나이<=64,longest5579,NA))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in c(10:13)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(longest5564 = as.numeric(최장근속기간),
+                          longest5564 = ifelse(longest5564%%100>6,longest5564%/%100+1,longest5564%/%100),
+                          longest5564 = ifelse(경제활동상태==3,NA,longest5564),
+                          longest5579 = longest5564)
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 14:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(longest5579 = as.numeric(최장근속기간),
+                          longest5579 = ifelse(경제활동상태==3,NA,longest5579),
+                          longest5564 = ifelse(만나이>=55&만나이<=64,longest5579,NA))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 이직시기
+for(i in c(1:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(transferage5579 = as.numeric(이직시기_만나이),
+                          transferage5579 = ifelse(경제활동상태==3,NA,transferage5579),
+                          transferage5564 = ifelse(만나이>=55&만나이<=64,transferage5579,NA))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+
+# 이직이유
+for(i in 1:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(transfer_reason5579 = as.numeric(이직이유),
+                          transfer_reason5579 = ifelse(경제활동상태==3,NA,transfer_reason5579),
+                          transfer_reason5564 = ifelse(만나이>=55&만나이<=64,transfer_reason5579,NA))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 이직시근로형태
+for(i in 9){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(transfer_type5579 = as.numeric(이직시근로형태),
+                          transfer_type5579 = ifelse(경제활동상태==3,NA,transfer_type5579),
+                          transfer_type5564 = ifelse(만나이>=55&만나이<=64,transfer_type5579,NA))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 10:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(transfer_type5564 = as.numeric(이직시근로형태),
+                          transfer_reason5564 = ifelse(경제활동상태==3,NA,transfer_reason5564))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 이직시업종
+for(i in 13:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(이직시업종=ifelse(경제활동상태==3,NA,이직시업종))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# 계속근로희망여부
+for(i in 11:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(계속근로희망여부=ifelse(계속근로희망여부==2,7,
+                                         ifelse(계속근로희망여부==1,계속근무희망주된이유,0)))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+```
+
+
+```{r}
+grepl_ <- function(DF){DF[grepl("이직이전일의종류",DF)]};lapply(merge_names,grepl_)
+# unique values 확인
+ulist <- list()
+for(i in c(6:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% select(취업관련시험준비))
+  ulist[[i]] <- unique(rslt)
+}
+ulist
+
+# 각 년도별 tabulation
+tlist <- list()
+for(i in c(1:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% select(계속근로희망여부))
+  tlist[[i]] <- table(rslt)
+}
+tlist
+grepl_ <- function(DF){DF[grepl("이유",DF)]};lapply(merge_names,grepl_)
+```
+
+```{r}
+varlist <- list()
+# 전체 연결 변수
+for(i in 1:length(dfnames)){
+  varlist[[i]] <- c("조사년월","출생년도","성별","만나이","혼인상태","가중치","취업여부","경제활동상태구분","종사상지위","교육정도","수학여부","계열",
+                    "가구주관계","직장을구하지않은이유","총취업시간","지난4주간구직여부","취업가능성_실업","취직가능성유무_비경활",
+                    "취업희망여부","고용계약여부","종사자규모","주업시간","추가취업및전직희망","직장시작시기","취업구분",    
+                    # 여기까지 고정변수. 아래부터는 고령층변수
+                    "경제활동상태", "최장근속기간", "이직시기_만나이","이직이유","지난1년간구직경험", "지난1년간비구직사유", "지난1년간구직경로",
+                    "지난1년간취업경험",
+                    "지난1년간주된경력과관련성","계속근로희망여부","일자리선택시고려사항","희망근로형태","희망임금수준",
+                    "longest5579","longest5564","transferage5579","transferage5564")
+}
+
+# 고정 변수
+for(i in 2:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"고용계약기간")
+}
+for(i in 1:4){
+  varlist[[i]] <- c(varlist[[i]],"산업_8차")
+}
+for(i in 1:13){
+  varlist[[i]] <- c(varlist[[i]],"산업_9차")
+}
+for(i in 9:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"산업_10차")
+}
+for(i in 1:4){
+  varlist[[i]] <- c(varlist[[i]],"직업_5차")
+}
+for(i in 1:13){
+  varlist[[i]] <- c(varlist[[i]],"직업_6차")
+}
+for(i in 9:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"직업_7차")
+}
+for(i in 1:10){
+  varlist[[i]] <- c(varlist[[i]],"활동상태")
+}
+for(i in 11:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"지난주주된활동상태")
+}
+
+# 고령층 변수
+for(i in 10:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"기존일자리근무여부")
+}
+for(i in 10:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"이직시근로형태")
+}
+for(i in 13:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"이직시업종")
+}
+for(i in 9:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"이직이전일의종류")
+}
+for(i in 13:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"지난1년간직업능력개발훈련참여여부")
+}
+for(i in 13:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"직업능력개발훈련참여경로")
+}
+for(i in 4:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"월평균수령액")
+}
+for(i in 7:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"근로희망나이")
+}
+for(i in c(11:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"계속근무희망주된이유")
+}
+```
+
+```{r}
+for(i in 1:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  colsnames_ <- unlist(varlist[[i]])
+  rslt <- rslt %>%select(colsnames_)
+  assign(paste0("main",i+2004),rslt)
+}
+```
+```{r}
+maindf <- rbind.fill(main2005,main2006)
+for(i in 3:length(dfnames)){
+  maindf <- rbind.fill(maindf,as.data.frame(get(paste0("main",i+2004))))
+}
+```
+```{r}
+# 산업/직업코드 인코딩
+ind8 <- read_excel("산업직업.xlsx",sheet="ind8")
+ind8$항목명 <- gsub("[(]","",ind8$항목명)
+ind8$항목명 <- gsub("[)]","",ind8$항목명)
+ind8$항목명 <- gsub("-","",ind8$항목명)
+ind8$항목명 <- gsub("[0-9]","",ind8$항목명)
+ind8 <- ind8 %>% mutate(id = row_number())
+ind9 <- read_excel("산업직업.xlsx",sheet="ind9")
+ind9$항목명 <- gsub("[(]","",ind9$항목명)
+ind9$항목명 <- gsub("[)]","",ind9$항목명)
+ind9$항목명 <- gsub("-","",ind9$항목명)
+ind9$항목명 <- gsub("[0-9]","",ind9$항목명)
+ind9 <- ind9 %>% mutate(id = row_number())
+ind10 <- read_excel("산업직업.xlsx",sheet="ind10")
+ind10$항목명 <- gsub("[(]","",ind10$항목명)
+ind10$항목명 <- gsub("[)]","",ind10$항목명)
+ind10$항목명 <- gsub("-","",ind10$항목명)
+ind10$항목명 <- gsub("[0-9]","",ind10$항목명)
+ind10 <- ind10 %>% mutate(id = row_number())
+job5 <- read_excel("산업직업.xlsx",sheet="job5")
+job5$항목명 <- gsub("[(]","",job5$항목명)
+job5$항목명 <- gsub("[)]","",job5$항목명)
+job5$항목명 <- gsub("-","",job5$항목명)
+job5$항목명 <- gsub("[0-9]","",job5$항목명)
+job5 <- job5 %>% mutate(id = row_number())
+job6 <- read_excel("산업직업.xlsx",sheet="job6")
+job6$항목명 <- gsub("[(]","",job6$항목명)
+job6$항목명 <- gsub("[)]","",job6$항목명)
+job6$항목명 <- gsub("-","",job6$항목명)
+job6$항목명 <- gsub("[0-9]","",job6$항목명)
+job6 <- job6 %>% mutate(id = row_number())
+job7 <- read_excel("산업직업.xlsx",sheet="job7")
+job7$항목명 <- gsub("[(]","",job7$항목명)
+job7$항목명 <- gsub("[)]","",job7$항목명)
+job7$항목명 <- gsub("-","",job7$항목명)
+job7$항목명 <- gsub("[0-9]","",job7$항목명)
+job7 <- job7 %>% mutate(id = row_number())
+
+maindf$산업_8차[maindf$산업_8차=="0"] <- NA
+maindf$산업_9차[maindf$산업_9차=="0"] <- NA
+maindf$산업_10차[maindf$산업_10차=="0"] <- NA
+maindf$직업_6차[maindf$직업_6차=="0"] <- NA
+maindf$직업_7차[maindf$직업_7차=="0"] <- NA
+maindf$직업_6차[maindf$직업_6차=="0"] <- NA
+maindf$직업_5차[maindf$직업_5차=="0"] <- NA
+
+maindf <- maindf %>%  mutate(ind8 = match(산업_8차,LETTERS))
+maindf$산업_8차 <- factor(maindf$ind8,1:20,unlist(ind8$항목명))
+maindf <- maindf %>%  mutate(ind9 = match(산업_9차,LETTERS))
+maindf$산업_9차 <- factor(maindf$ind9,1:21,unlist(ind9$항목명))
+maindf <- maindf %>%  mutate(ind10 = match(산업_10차,LETTERS))
+maindf$산업_10차 <- factor(maindf$ind10,1:21,unlist(ind10$항목명))
+maindf$직업_5차 <- factor(maindf$직업_5차,1:10,unlist(job5$항목명))
+maindf$직업_6차 <- factor(maindf$직업_6차,1:9,unlist(job6$항목명))
+maindf$직업_7차 <- factor(maindf$직업_7차,1:9,unlist(job7$항목명))
+
+maindf <- maindf %>% select(-c(Cs(ind8,ind9,ind10)))
+```
+```{r}
+names(maindf)
+```
+```{r}
+table(maindf$조사년월,maindf$이직시기_만나이)
+table(maindf[maindf$조사년월 == 201805,]$이직시기_만나이 , maindf[maindf$조사년월 == 201805,]$만나이)
+```
+
+
+```{r}
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님\\코어 데이터 - 경활 본조사 및 부가조사\\경활 부가조사\\데이터_raw")
+write_dta(maindf,"경활 고령층부가조사.dta")
+```
+
+
+
+

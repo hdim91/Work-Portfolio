@@ -1,0 +1,1100 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(plyr)
+library(tidyverse)
+library(haven)
+library(readxl)
+library(xlsx)
+library(readr)
+```
+
+
+```{r}
+rm(list=ls())
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\경활 근로형태별\\데이터")
+
+temp <- list.files(pattern="txt")
+temp_xls <- list.files(pattern="xlsx")
+temp;temp_xls
+
+split_nm <- c()
+years <- 2003:2021
+for(i in 1:9){
+  split_nm <- c(split_nm, paste0("split",years[i]))
+  assign(split_nm[i],read_excel(temp_xls[1],sheet = as.character(years[i])))
+}
+for(i in 10:14){
+  split_nm <- c(split_nm, paste0("split",years[i]))
+  assign(split_nm[i],read_excel(temp_xls[2],sheet = as.character(years[i])))
+}
+for(i in 15:length(years)){
+  split_nm <- c(split_nm, paste0("split",years[i]))
+  assign(split_nm[i],read_excel(temp_xls[3],sheet = as.character(years[i])))
+}
+split_list <- lapply(ls(pattern = "split[0-9]"),function(x) get(x))
+
+for(i in 1:length(split_list)){
+  split_list[[i]]["year"] <- 2002+i
+  split_list[[i]] <- split_list[[i]][c("항목명","시작위치","길이","year")]
+}
+
+change_type <- function(DF){
+  DF[,"길이"] <- as.numeric(unlist(DF[,c("길이")]))
+  DF
+}
+
+split_list <- lapply(split_list, change_type)
+split_df <- split_list[[1]]
+for(i in 2:length(split_list)){
+  split_df <- rbind(split_df,split_list[[i]])
+}
+
+rm(list = ls(pattern = "split[0-9]"))
+
+```
+
+```{r message=FALSE,warning=FALSE}
+dfnames <- c()
+for(i in 2003:2021){
+  dfnames <- c(dfnames, paste0("type",i))
+}
+
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\경활 근로형태별\\데이터")
+for(i in 1:length(temp)){
+  assign(paste0("type",2002+i),
+         read_fwf(temp[i],
+                  col_positions = fwf_widths(unlist(split_df[split_df$year==i+2002,
+                                                             c("길이")]))))
+}
+nm_list <- list()
+for(i in 1:length(dfnames)){
+  rslt <- get(dfnames[i])
+  n_list <- unlist(split_df[split_df$year==i+2002 , c("항목명")])
+  n_list <- gsub("[(]" , "_" , n_list)
+  n_list <- gsub("[)]" , "" , n_list)
+  n_list <- gsub(" " , "" , n_list)
+  n_list <- gsub("[.]" , "" , n_list)
+  n_list <- gsub("/" , "" , n_list)
+  n_list <- gsub("[0-9]{2}[-][0-9]" , "" , n_list)
+  n_list <- gsub("[0-9]{1}[-][0-9]" , "" , n_list)
+  n_list <- gsub("[-]" , "" , n_list)
+  n_list <- gsub("1주" , "일주" , n_list)
+  n_list <- gsub("1개월" , "일개월" , n_list)
+  n_list <- gsub(" , " , "" , n_list)
+  n_list <- gsub("[?]" , "" , n_list)
+  n_list <- gsub("^36미만" , "평소36미만" , n_list)
+  n_list <- gsub("^4주간" , "지난4주간" , n_list)
+  n_list <- gsub("출생년_" ,  "출생년도_" ,  n_list)
+  n_list <- gsub("_yyyy" ,  "" ,  n_list)
+  n_list <- gsub("_YYYY" , "" , n_list)
+  n_list <- gsub("^[0-9]{2}" , "" , n_list)
+  n_list <- gsub("^[0-9]{1}" , "" , n_list)
+  n_list <- gsub("^[0-9]{1}" , "" , n_list)
+  n_list <- gsub("weight" ,"Weight" ,n_list )
+  n_list <- gsub("승수" , "가중치" , n_list)
+  n_list <- gsub("경제활동상태구분항목" , "경제활동상태구분" , n_list)
+  n_list <- gsub( "가구주와의관계" , "가구주관계" , n_list)
+  n_list <- gsub( "차개정" ,  "차" ,  n_list)
+  n_list <- gsub( "취업가능성_실업판단항목" ,  "취업가능성_실업" ,  n_list)
+  n_list <- gsub( "취업가능성유무_실업자여부판단항목" ,  "취업가능성_실업" ,  n_list)
+  n_list <- gsub( "지난4주내구직여부_취업자여부판단항목"  ,  "지난4주간구직여부"  ,  n_list)
+  n_list <- gsub( "-계열_교육정도" ,  "교육정도_계열" ,  n_list)
+  n_list <- gsub("^생년" , "출생년도" , n_list)
+  n_list <- gsub( "신가중치_Weight" , "가중치_Weight"  ,n_list)
+  n_list <- gsub(  "교육정도_수학여부" ,  "수학여부"  ,  n_list )
+  n_list <- gsub("지난일주간활동상태" , "활동상태" , n_list)
+  n_list <- gsub("직장시작시기_연월" , "직장시작시기" , n_list)
+  n_list <- gsub("추가취업유무" , "추가취업및전직희망" , n_list)
+  n_list <- gsub("주된일_주업실제취업시간" , "주업시간" , n_list)
+  n_list <- gsub("총실제취업시간" , "총취업시간" , n_list)
+  n_list <- gsub("지난4주내구직여부" , "지난4주간구직여부" , n_list)
+  n_list <- gsub("구직가능성" , "취업가능성_실업" , n_list)
+  n_list <- gsub("교육정도_계열" , "계열" , n_list)
+  n_list <- gsub("계열_교육정도" , "계열" , n_list)
+  n_list <- gsub("신산업" , "산업" , n_list)
+  n_list <- gsub("신직업" , "직업" , n_list)
+  n_list <- gsub( "조사년월일" , "조사년월" , n_list)
+  n_list <- gsub( "지난주주된활동상태" , "활동상태" , n_list)
+  n_list <- gsub( "직장을구하지않는이유" , "직장을구하지않은이유" , n_list)
+  n_list <- gsub( "고용계약기간여부" , "고용계약여부" , n_list)
+  n_list <- gsub( "지난일주간취업여부" , "취업여부" , n_list)
+  n_list <- gsub( "지난주취업여부" , "취업여부" , n_list)
+  n_list <- gsub( "시급제보수액" , "시급제임금" , n_list)
+  n_list <- gsub( "취직가능성유무" , "취직가능성유무_비경활" , n_list)
+  n_list <- gsub( "취업가능성유무" , "취직가능성유무_비경활" , n_list)
+  n_list <- gsub( "구직의사유무" , "취업희망여부" , n_list)
+  n_list <- gsub( "현일자리시작일자" , "현재사업_일자리시작" , n_list)
+  n_list <- gsub( "현재사업_일자리시작일" , "현재사업_일자리시작" , n_list )
+  n_list <- gsub( "운영_소속된하는사업체의" , "사업체의주된장소" , n_list )
+  n_list <- gsub( "귀하께서운영하는사업체주장소" , "사업체의주된장소" , n_list)
+  n_list <- gsub("사업체의형태" , "사업체의조직형태" , n_list)
+  n_list <- gsub("귀하께서운영하는사업체는어떤형태" , "사업체의조직형태" , n_list)
+  n_list <- gsub("_모든자영업자국민연금가입또는연금여부" , "국민연금가입수혜여부" , n_list)
+  n_list <- gsub("국민연금가입또는연금수급" , "국민연금가입수혜여부" , n_list)
+  n_list <- gsub("사업장산재보험가입여부" , "산재보험가입여부" , n_list)
+  n_list <- gsub("고용원이있는자영업자산재보험가입여부" , "산재보험가입여부" , n_list)
+  n_list <- gsub("국면연금가입수혜여부" , "국민연금가입수혜여부" , n_list)
+  n_list <- gsub("_산재보험가입여부" , "산재보험가입여부" , n_list)
+  n_list <- gsub("평소일주일근로시간" , "일주일간근무시간" , n_list)
+  n_list <- gsub("귀하사업체평소일주일몇시간일" , "일주일간근무시간" , n_list)
+  n_list <- gsub("현재사업체앞으로의계획" , "향후일자리계획" , n_list)
+  n_list <- gsub("사업체에대해앞으로계획" , "향후일자리계획" , n_list)
+  n_list <- gsub("번그만둘계획인경우" , "그만둘계획인경우" , n_list)
+  n_list <- gsub("향후일자리계획_그만둘계획인경우" , "그만둘계획인경우" , n_list)
+  n_list <- gsub("현재사업체_일자리그만두려는이유" , "일자리그만두려는이유" , n_list)
+  n_list <- gsub("_사업체를향후그만둘계획인자영업자그만두려는이유" , "일자리그만두려는이유" , n_list)
+  n_list <- gsub("현재사업처음시작사업자금의규모" , "창업자금규모" , n_list)
+  n_list <- gsub("창업자금의규모" , "창업자금규모" , n_list)
+  n_list <- gsub("수입을목적으로일한경험유무" , "현재일시작전일한경험" , n_list)
+  n_list <- gsub( "현재일시작전2년이내일한경험" , "현재일시작전일한경험" , n_list)
+  n_list <- gsub( "^일자리형태" , "경험한일자리형태" , n_list)
+  n_list <- gsub("경험한일자리는어떤형태" , "경험한일자리형태" , n_list)
+  n_list <- gsub("현재사업처음시작준비기간" , "사업준비기간" , n_list)
+  n_list <- gsub("현재사업시작주된동기" , "사업시작동기" , n_list)
+  n_list <- gsub("현재사업시작시가장어려웠던점" , "사업시작시애로사항" , n_list)
+  n_list <- gsub("현재사업직전어떤일을하였는가" , "현재사업직전에한일" , n_list)
+  n_list <- gsub("직전사업유지기간_운영기간" , "직전사업유지_운영기간" , n_list)
+  n_list <- gsub("직적사업에서현재사업업종전환사유" , "업종전환사유" , n_list)
+  n_list <- gsub("^정했음" , "고용계약기간" , n_list)
+  n_list <- gsub("고용시근로기간을정했나_정하였다면기간은" , "고용계약기간" , n_list)
+  
+  n_list <- gsub("향후취업ㆍ창업희망여부" , "향후취업창업희망여부" , n_list)
+  n_list <- gsub("취업ㆍ창업희망이유" , "취업창업희망이유" , n_list)
+  n_list <- gsub("취업ㆍ창업시희망시기" , "취업창업시희망시기" , n_list)
+  n_list <- gsub("취업ㆍ창업희망임금_수입" , "취업창업희망임금_수입" , n_list)
+  n_list <- gsub("희망고용형태" , "희망고용형태" , n_list)
+  n_list <- gsub("취업시고려사항" , "취업시고려사항" , n_list)
+  n_list <- gsub("시간제선택주된이유" , "시간제희망주된이유" , n_list)
+  n_list <- gsub("전직시기" , "이직시기_연월" , n_list)
+  n_list <- gsub("이전직장산업" , "전직산업" , n_list)
+  n_list <- gsub("이전직장직업" , "전직직업" , n_list)
+  n_list <- gsub("이전직장종사자규모" , "전직종사자규모" , n_list)
+  n_list <- gsub("이전직장지위" , "전직종사상지위" , n_list)
+  n_list <- gsub("시간제선택주된이유" , "시간제희망주된이유" , n_list)
+  n_list <- gsub("이직유무" , "전직유무" , n_list)
+  
+  n_list <- gsub("전일제,시간제시간" , "평소시간" , n_list)
+  n_list <- gsub("시간제주된이유" , "시간제이유" , n_list)
+  n_list <- gsub("시간제근로정해진이유" , "시간제이유" , n_list)
+  n_list <- gsub("전일제일자리를구할수없어서" , "시간제이유" , n_list)
+  n_list <- gsub("건강보험_직장의료보험" , "건강보험" , n_list)
+  n_list <- gsub("퇴직급여_퇴직금,퇴직연금" , "퇴직금" , n_list)
+  n_list <- gsub("퇴직급여" , "퇴직금" , n_list)
+  n_list <- gsub("근로계약서작성여부" , "근로계약작성여부" , n_list)
+  n_list <- gsub("유연근무제활용여부" , "유연근무제활용" , n_list)
+  n_list <- gsub("유연근무제_1_복수응답2자리" , "유연근무제활용형태1" , n_list)
+  n_list <- gsub("유연근무제_2_복수응답2자리" , "유연근무제활용형태2" , n_list)
+  n_list <- gsub("향후활용할유연근무제형태_" , "향후유연근무제활용형태" , n_list)
+  n_list <- gsub("향후유연근무제활용형태_" , "향후유연근무제활용형태" , n_list)
+  n_list <- gsub("_복수응답2자리" , "" , n_list)
+  n_list <- gsub("종사상규모" , "종사자규모" , n_list)
+  n_list <- gsub("교육정도_학력" , "교육정도" , n_list)
+  n_list <- gsub("일주간구직여부_취업판단항목" , "일주간구직여부" , n_list)
+  n_list <- gsub("전에수입을목적으로일한경험_" , "" , n_list)
+  n_list <- gsub("일을그만둔시기의1년미만여부_이직시기1년미만여부" , "이직시기1년미만여부" , n_list)
+  n_list <- gsub("일을그만둔시기_이직시기,연월" , "이직시기_연월" , n_list)
+  
+  
+  # n_list <- gsub("교육정도_학력" , "퇴직금" , n_list)
+  
+  
+  nm_list[[i]] <- n_list
+  names(rslt) <- n_list
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# type2007 <- type2007[-28]
+names(type2014)[14]<-"지난4주내추가취업구직여부"
+names(type2014)[36] <- "이직시기_연월"
+names(type2003)[42] <- "고용계약기간"
+names(type2003)[48] <- "계약기간반복갱신여부"
+names(type2003)[47] <- "가중치_Weight"
+names(type2003)[52] <- "향후기대근속기간"
+names(type2003)[53] <- "년이하인경우_개월"
+names(type2003)[50] <- "계속근로가능여부"
+names(type2003)[51] <- "계속근로가능여부_이유"
+names(type2003)[54] <- "근속기간제한이유"
+names(type2003)[55] <- "근로시간형태"
+names(type2003)[56] <- "평소시간"
+names(type2003)[69] <- "최근3개월간임금"
+names(type2003)[49] <- "단기근로기간형태"
+names(type2003)[58] <- "급여받은곳"
+names(type2003)[59] <- "특수고용여부"
+names(type2003)[60] <- "가정내근로여부"
+names(type2003)[61] <- "국민연금또는특수직연금"
+names(type2003)[14] <- "지난4주간구직여부"
+names(type2003)[36] <- "산업_8차"
+names(type2003)[37] <- "직업_5차"
+names(type2003)[13] <- "일주간구직여부"
+
+
+names(type2003);names(type2019)
+# nm_list[[8]][grepl("이직",nm_list[[8]])]
+names(type2003)
+```
+
+
+```{r}
+tlist <- list()
+for(i in c(3:9,11,13:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% select(향후일자리계획))
+  tlist[[i]] <- table(rslt)
+}
+
+tlist <- list()
+for(i in c(10,12:length(dfnames))){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- unlist(rslt %>% select(쉰주된이유))
+  tlist[[i]] <- table(rslt,useNA = "ifany")
+}
+tlist
+```
+```{r}
+merge_names <- list()
+for(i in 1:length(dfnames)){
+  merge_names[i] <- list(names(get(dfnames[i])))
+}
+grepl_ <- function(DF){DF[grepl("이직",DF)]};lapply(merge_names, grepl_)
+
+```
+```{r}
+for(i in 5:11){
+  rslt <- as.data.frame(get(dfnames[i]))
+  names(rslt) <- gsub("고용시근로기간을정했나","고용계약기간",names(rslt))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+
+for(i in 10:11){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt["고용계약기간"] <- as.numeric(unlist(rslt["고용계약기간"]))
+  rslt <- rslt %>% mutate(고용계약기간 = 고용계약기간*10,
+                          고용계약기간 = ifelse(고용계약기간==10,1,
+                                                ifelse(고용계약기간==20&근로기간이2인경우==1,2,
+                                                             ifelse(고용계약기간==20&근로기간이2인경우==2,3,
+                                                                          ifelse(고용계약기간>20,고용계약기간/10+1,0)))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+type2014 <- type2014 %>% mutate(고용계약기간=as.numeric(고용계약기간),
+                                    고용계약기간 = 고용계약기간*10,
+                                    고용계약기간 = ifelse(고용계약기간==10,1,
+                                                ifelse(고용계약기간==20&고용계약기간이2인경우==1,2,
+                                                             ifelse(고용계약기간==20&고용계약기간이2인경우==2,3,
+                                                                          ifelse(고용계약기간>20,고용계약기간/10+1,0)))),
+                                    고용계약여부 = 고용시근로기간을정했나)
+type2007 <- type2007 %>% mutate(고용계약기간= 고용계약기간*10,
+                                                    고용계약기간 = ifelse(고용계약기간==10,1, #1개월 미만
+                                                                   ifelse(고용계약기간==20,8, # 1개월 이상~ 1년미만
+                                                                   ifelse(고용계약기간==30,4, #1년
+                                                                   ifelse(고용계약기간==40&조사년월%%100<7,9, # 1년초과~3년이하
+                                                                   ifelse(고용계약기간==50&조사년월%%100<7,7, # 3년초과
+                                                                   ifelse(고용계약기간==40&조사년월%%100>6,10, # 1년초과~2년이하 - 2007년 7월~12월
+                                                                   ifelse(고용계약기간==50&조사년월%%100>6,11,0)))))))) # 2년초과
+
+for(i in 6:9){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(고용계약기간 = as.numeric(고용계약기간),
+                                고용계약기간 = 고용계약기간 * 10,
+                                고용계약기간 = ifelse(고용계약기간==10,1,
+                                                      ifelse(고용계약기간==20,8,
+                                                                   ifelse(고용계약기간>20,고용계약기간/10+1,0))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+for(i in 6){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(현재사업_일자리시작월=as.numeric(현재사업_일자리시작월),
+                          현재사업_일자리시작 = ifelse(현재사업_일자리시작월<10,paste0(현재사업_일자리시작년,"0",현재사업_일자리시작월),
+                                                         paste0(현재사업_일자리시작년,현재사업_일자리시작월)),
+                                    현재사업_일자리시작=as.numeric(현재사업_일자리시작))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+
+for(i in 5:11){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(향후일자리계획 = ifelse(향후일자리계획>0,향후일자리계획+1,향후일자리계획))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 16:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(향후일자리계획 = as.numeric(향후일자리계획),
+                                 그만둘계획인경우 = ifelse(향후일자리계획>300&향후일자리계획<400,향후일자리계획-300,NA),
+                                 향후일자리계획=향후일자리계획%/%100)
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+
+type2003 <- type2003 %>% 
+  mutate(경제활동상태구분 = ifelse(취업가능성_실업==1,2,
+                                   ifelse(일주간구직여부==0,1,
+                                                  ifelse(지난4주간구직여부==2|취직가능성유무_비경활==2,3,NA))))
+```
+
+```{r}
+varlist <- list()
+for(i in 1:length(dfnames)){
+  varlist[[i]] <- c("조사년월","성별","만나이","출생년도","혼인상태","가중치_Weight","취업여부","종사상지위","종사자규모","교육정도","수학여부",
+                    "졸업년도","계열","활동상태","지난4주간구직여부","가구주관계","직장을구하지않은이유","직장시작시기",'추가취업및전직희망',"주업시간","총취업시간",
+                    "취업가능성_실업","고용계약여부","고용계약기간","경제활동상태구분",
+                    "계약기간반복갱신여부","단기근로기간형태","계속근로가능여부","계속근로가능여부_이유","향후기대근속기간","년이하인경우_개월","근속기간제한이유",
+                    "근로시간형태","평소시간","급여받은곳","특수고용여부","가정내근로여부","국민연금또는특수직연금","건강보험","고용보험","퇴직금","상여금",
+                    "시간외수당","노동조합가입여부","최근3개월간임금",
+                    "취직가능성유무_비경활","취업희망여부","전직유무","이직시기_연월")
+}
+
+varlist2003 <- c("산업_8차","직업_5차")
+varlist2004 <- c("산업_9차","직업_6차")
+varlist2005 <- c("산업_9차","직업_6차")
+varlist2006 <- c("산업_9차","직업_6차")
+varlist2007 <- c("산업_9차","직업_6차")
+varlist2008 <- c("산업_9차","직업_6차")
+varlist2009 <- c("산업_9차","직업_6차")
+varlist2010 <- c("산업_9차","직업_6차","시급제임금")
+varlist2011 <- c("산업_9차","직업_6차","시급제임금")
+varlist2012 <- c("산업_9차","직업_6차","시급제임금","추가취업가능성")
+varlist2013 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성")
+varlist2014 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성")
+varlist2015 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2016 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2017 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2018 <- c("산업_10차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2019 <- c("산업_10차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2020 <- c("산업_10차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2021 <- c("산업_10차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+
+for(i in 1:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],get(paste0("varlist",i+2002)))
+}
+
+for(i in 1:12){
+  varlist[[i]] <- c(varlist[[i]],"일주간구직여부")
+}
+
+#임금근로자
+
+for(i in c(1,11:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"시간제이유")
+}
+for(i in c(2:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"지난주일자리취업동기","유급휴가","임금형태")
+}
+for(i in c(4:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"주된취업사유","교육훈련경험여부")
+}
+for(i in c(8:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"시급제임금")
+}
+for(i in c(1:14,16:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"근로계약작성여부")
+}
+for(i in c(13:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"유연근무제활용","유연근무제활용형태1","유연근무제활용형태2")
+}
+
+
+# 비임금근로자
+
+for(i in c(5:11,13,15:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"현재사업_일자리시작","사업체의주된장소","사업체의조직형태","사업자금조달방법_1순위","사업자금조달방법_2순위",
+                    "국민연금가입수혜여부","산재보험가입여부","일주일간근무시간","향후일자리계획","그만둘계획인경우","일자리그만두려는이유")
+}
+for(i in c(8:11,13,15:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"창업자금규모")
+}
+for(i in c(10:11,13,15:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"현재일시작전일한경험","경험한일자리형태")
+}
+for(i in c(13,15:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"사업준비기간","사업시작동기","사업시작시애로사항","직전사업유지_운영기간","업종전환사유")
+}
+for(i in c(15:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"현재사업직전에한일")
+}
+for(i in c(14,16:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"쉰주된이유","향후취업창업희망여부","의사가없는주된이유","향후구직의사","취업창업희망이유","희망고용형태",
+                    "시간제희망주된이유","취업시고려사항","취업희망업종","취업희망직종","창업시고려사항","희망자영업업종","자영업희망주된이유")
+}
+for(i in c(16:length(dfnames))){
+  varlist[[i]] <- c(varlist[[i]],"취업희망임금_수입")
+}
+for(i in 13:length(dfnames)){
+  varlist[[i]] <- c(varlist[[i]],"전직산업_10차","전직종사자규모","전직직업_7차","전직종사상지위")
+}
+for(i in 13:15){
+  varlist[[i]] <- c(varlist[[i]],"전직산업_9차","전직직업_6차")
+}
+names(type2021)
+```
+
+
+
+
+```{r}
+for(i in 1:length(dfnames)){
+  rslt <- as.data.frame(get(dfnames[i]))
+  colsnames <- unlist(varlist[[i]])
+  rslt <- rslt %>% select(colsnames)
+  assign(paste0("main",i+2002),rslt)
+}
+```
+
+```{r}
+mnames <- c()
+for(i in 2003:years[length(dfnames)]){
+  mnames <- c(mnames,paste0("main",i))
+}
+# years[length(dfnames)]
+```
+
+```{r}
+for(i in 1:5){
+  rslt <- as.data.frame(get(mnames[i]))
+  rslt <- rslt %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+  rslt <- rslt %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                       가중치 = as.numeric(가중치_Weight)/1000,
+                                       한시적근로자 = ifelse(((고용계약여부==1)|
+                                                    (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                    (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                        ifelse(!((고용계약여부==1)|
+                                                    (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                    (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                        기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                              ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                        시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                              ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                        파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                            ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                        용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                            ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                        특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                               ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                        가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                               ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                        일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                               ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                        비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                            ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,
+                                                                   NA)),
+                                        정규직 = 1 - 비정규직
+                                        )
+  assign(mnames[i],rslt)
+}
+
+
+for(i in 6:11){
+  rslt <- as.data.frame(get(mnames[i]))
+  rslt <- rslt %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+  rslt <- rslt %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                     가중치 = as.numeric(가중치_Weight)/1000,
+                                     한시적근로자 = ifelse(((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                      ifelse(!((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                      기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                            ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                      시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                            ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                      파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                          ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,NA)),
+                                      정규직 = 1 - 비정규직
+                                      )
+  assign(mnames[i],rslt)
+}
+for(i in 12:length(dfnames)){
+  rslt <- as.data.frame(get(mnames[i]))
+  rslt <- rslt %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+  rslt <- rslt %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                     가중치 = as.numeric(가중치_Weight)/1000,
+                               급여받은곳 = as.numeric(급여받은곳),
+                                     한시적근로자 = ifelse(((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                      ifelse(!((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                      기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                            ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                      시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                            ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                      파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                          ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,NA)),
+                                      정규직 = 1 - 비정규직
+                                      )
+  assign(mnames[i],rslt)
+}
+
+
+```
+
+```{r}
+rm(list=ls(pattern = "type[0-9]"))
+```
+
+
+
+
+```{r}
+main_df <- rbind.fill(main2003,main2004)
+rm(list=c("main2003","main2004"))
+for(i in 3:length(dfnames)){
+  main_df <- rbind.fill(main_df,as.data.frame(get(paste0("main",i+2002))))
+  rm(list=paste0("main",i+2002))
+}
+
+main_df <- main_df %>% select(-가중치_Weight)
+main_df$향후일자리계획 <- ifelse(main_df$종사상지위<4,NA,main_df$향후일자리계획)
+
+
+main_df$조사년월[main_df$조사년월=="030815"] <- "200308"
+main_df$조사년월 <- as.numeric(main_df$조사년월)
+main_df$만나이 <- as.numeric(main_df$만나이)
+main_df$졸업년도 <- as.numeric(main_df$졸업년도)
+main_df$졸업년도 <- ifelse(main_df$졸업년도==0,NA,main_df$졸업년도)
+main_df$계열 <- as.numeric(main_df$계열)
+main_df$활동상태 <- as.numeric(main_df$활동상태)
+main_df$직장을구하지않은이유 <- as.numeric(main_df$직장을구하지않은이유)
+main_df$직장시작시기 <- as.numeric(main_df$직장시작시기)
+main_df$직장시작시기 <- ifelse(main_df$직장시작시기==0,NA,main_df$직장시작시기)
+
+main_df$주업시간 <- as.numeric(main_df$주업시간)
+main_df$총취업시간 <- as.numeric(main_df$총취업시간)
+main_df$년이하인경우_개월 <- as.numeric(main_df$년이하인경우_개월)
+main_df$년이하인경우_개월 <- ifelse(main_df$년이하인경우_개월==0,NA,main_df$년이하인경우_개월)
+main_df$근속기간제한이유 <- as.numeric(main_df$근속기간제한이유)
+main_df$근속기간제한이유 <- ifelse(main_df$근속기간제한이유==0&main_df$종사상지위>3,NA,main_df$근속기간제한이유)
+
+main_df$국민연금또는특수직연금 <- as.numeric(main_df$국민연금또는특수직연금)
+main_df$건강보험 <- as.numeric(main_df$건강보험)
+main_df$고용보험 <- as.numeric(main_df$고용보험)
+main_df$퇴직금 <- as.numeric(main_df$퇴직금)
+main_df$상여금 <- as.numeric(main_df$상여금)
+main_df$시간외수당 <- as.numeric(main_df$시간외수당)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+
+main_df$이직시기_연월 <- as.numeric(main_df$이직시기_연월)
+main_df$유급휴가 <- as.numeric(main_df$유급휴가)
+main_df$주된취업사유 <- as.numeric(main_df$주된취업사유)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+```
+
+# KOSIS 확인
+```{r}
+# 정규직 비정규직 인구 확인
+# main_df %>% filter(!is.na(정규직)) %>% group_by(조사년월,정규직) %>% summarise(weight=sum(가중치)) %>% filter(조사년월>201212) 
+
+# 업종전환사유 확인
+# main_df %>% filter(!is.na(업종전환사유)&업종전환사유>0) %>%  group_by(조사년월,업종전환사유) %>% summarise(weight = sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+# 사업체주된장소 확인
+# main_df %>% filter(!is.na(사업체의주된장소)&사업체의주된장소>0) %>% group_by(조사년월,사업체의주된장소) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100) %>% filter(조사년월>201112)
+
+# 일주일간근무시간 확인
+# main_df %>% mutate(일주일간근무시간 = as.numeric(일주일간근무시간)) %>% 
+#   filter(종사상지위>3&!is.na(현재사업_일자리시작)&일주일간근무시간!=0&조사년월>201112) %>% 
+#   group_by(조사년월) %>% summarise(일주일간근무시간 = weighted.mean(일주일간근무시간,가중치))
+
+# # 산재보험가입여부 확인
+# main_df %>% filter(!is.na(산재보험가입여부)&산재보험가입여부!=0) %>% 
+#   group_by(조사년월,산재보험가입여부) %>% 
+#   summarise(weight = sum(가중치)) %>% mutate(prop = weight/sum(weight)*100)
+
+# # 경험한일자리형태 확인
+# main_df %>% mutate(현재사업_일자리시작=as.numeric(현재사업_일자리시작)) %>% mutate(type = ifelse(현재일시작전일한경험==2,3,경험한일자리형태)) %>% filter(!is.na(type)&type!=0) %>% 
+#   group_by(조사년월,type) %>% summarise(weight = sum(가중치)) %>% mutate(prop = weight/sum(weight)*100)
+
+# 창업자금규모 확인
+main_df %>% filter(창업자금규모!=0&!is.na(창업자금규모)) %>%
+  group_by(조사년월,창업자금규모) %>% summarise(weight = sum(가중치)) %>% mutate(prop = weight/sum(weight)*100)
+
+# 향후일자리계획 확인
+main_df %>% filter(향후일자리계획!=0&!is.na(향후일자리계획)) %>%
+  group_by(조사년월,향후일자리계획) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+# # 일자리그만두려는이유 확인
+# main_df %>% filter(일자리그만두려는이유!=0&!is.na(일자리그만두려는이유)) %>% 
+#   group_by(조사년월,일자리그만두려는이유) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+# # 국민연금가입수혜여부 
+# main_df %>% filter(국민연금가입수혜여부!=0&!is.na(국민연금가입수혜여부)) %>%
+#   group_by(조사년월,국민연금가입수혜여부) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+# # 사업시작동기 확인
+# main_df %>% filter(사업시작동기!=0&!is.na(사업시작동기)) %>%
+#   group_by(조사년월,사업시작동기) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+# # 사업준비기간 확인
+# main_df %>% filter(사업준비기간!=0&!is.na(사업준비기간)) %>%
+#   group_by(조사년월,사업준비기간) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+# # 사업시작시애로사항 확인
+# main_df %>% filter(사업시작시애로사항!=0&!is.na(사업시작시애로사항)) %>%
+#   group_by(조사년월,사업시작시애로사항) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+# # 사업체의주된장소 확인
+# main_df %>% filter(사업체의주된장소!=0&!is.na(사업체의주된장소)) %>%
+#   group_by(조사년월,사업체의주된장소) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+# # 사업체의조직형태 확인
+# main_df %>% filter(사업체의조직형태!=0&!is.na(사업체의조직형태)) %>%
+#   group_by(조사년월,사업체의조직형태) %>% summarise(weight=sum(가중치)) %>% mutate(prop=weight/sum(weight)*100)
+
+
+
+```
+
+# 8월 부가조사만 사용시 아래코드로 생성
+
+```{r}
+rm(list = ls(pattern = "type"))
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님\\코어 데이터 - 경활 본조사 및 부가조사\\경활 부가조사\\데이터_raw")
+write_dta(main_df,"경활 부가조사데이터_raw.dta")
+```
+
+
+```{r}
+# setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2019년 과제\\수시과제\\경활 총괄\\데이터")
+# write_dta(main_df,"경활 8월 부가조사데이터.dta")
+```
+########################################################################################################################
+# 3월 부가조사
+
+```{r}
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\경활 근로형태별\\3월 데이터")
+temp <- list.files(pattern="txt")
+temp_xls <- list.files(pattern="xls")
+temp;temp_xls
+
+split_nm <- c()
+years <- 2007:2016
+for(i in 2007:2011){
+  split_nm <- c(split_nm, paste0("split",i))
+  assign(split_nm[i-2006],read_excel(temp_xls[1],sheet = as.character(i)))
+}
+for(i in 2012:2016){
+  split_nm <- c(split_nm, paste0("split",i))
+  assign(split_nm[i-2006],read_excel(temp_xls[2],sheet = as.character(i)))
+}
+split_list <- lapply(ls(pattern = "split[0-9]"),function(x) get(x))
+
+for(i in 1:length(split_list)){
+  split_list[[i]]["year"] <- 2006+i
+  split_list[[i]] <- split_list[[i]][c("항목명","시작위치","길이","year")]
+}
+
+change_type <- function(DF){
+  DF[,"길이"] <- as.numeric(unlist(DF[,c("길이")]))
+  DF
+}
+
+split_list <- lapply(split_list, change_type)
+split_df <- split_list[[1]]
+for(i in 2:length(split_list)){
+  split_df <- rbind(split_df,split_list[[i]])
+}
+
+rm(list = ls(pattern = "split[0-9]"))
+```
+
+```{r message=FALSE,warning=FALSE}
+rm(list=ls(pattern = "type[0-9]"))
+dfnames <- c()
+for(i in 2007:2016){
+  dfnames <- c(dfnames, paste0("type",i))
+}
+
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\경활 근로형태별\\3월 데이터")
+for(i in 1:length(temp)){
+  assign(paste0("type",2006+i),
+         read_fwf(temp[i],
+                  col_positions = fwf_widths(unlist(split_df[split_df$year==i+2006,
+                                                             c("길이")]))))
+}
+
+```
+
+```{r}
+for(i in 1:length(dfnames)){
+  rslt <- get(dfnames[i])
+  n_list <- unlist(split_df[split_df$year==i+2006,c("항목명")])
+  n_list <- gsub("[(]","_",n_list)
+  n_list <- gsub("[)]","",n_list)
+  n_list <- gsub(" ","",n_list)
+  n_list <- gsub("/","",n_list)
+  n_list <- gsub("[0-9]{2}[-][0-9]","",n_list)
+  n_list <- gsub("[0-9]{1}[-][0-9]","",n_list)
+  n_list <- gsub("[-]","",n_list)
+  n_list <- gsub("1주","일주",n_list)
+  n_list <- gsub("1개월","일개월",n_list)
+  n_list <- gsub(",","",n_list)
+  n_list <- gsub("[?]","",n_list)
+  n_list <- gsub("^36미만","평소36미만",n_list)
+  n_list <- gsub("^4주간","지난4주간",n_list)
+  n_list <- gsub("출생년_","출생년도_",n_list)
+  n_list <- gsub("_yyyy","",n_list)
+  n_list <- gsub("_YYYY","",n_list)
+  n_list <- gsub("weight","Weight",n_list)
+  n_list <- gsub("승수","가중치",n_list)
+  n_list <- gsub("경제활동상태구분항목","경제활동상태구분",n_list)
+  n_list <- gsub("가구주와의관계","가구주관계",n_list)
+  n_list <- gsub("차개정","차",n_list)
+  n_list <- gsub("취업가능성_실업판단항목","취업가능성_실업",n_list)
+  n_list <- gsub("취업가능성유무_실업자여부판단항목","취업가능성_실업",n_list)
+  n_list <- gsub("지난4주내구직여부_취업자여부판단항목","지난4주간구직여부",n_list)
+  n_list <- gsub("-계열_교육정도","교육정도_계열",n_list)
+  n_list <- gsub("^생년","출생년도",n_list)
+  n_list <- gsub("신가중치_Weight","가중치_Weight",n_list)
+  n_list <- gsub("교육정도_수학여부","수학여부",n_list)
+  n_list <- gsub("지난일주간활동상태","활동상태",n_list)
+  n_list <- gsub("직장시작시기_연월","직장시작시기",n_list)
+  n_list <- gsub("추가취업유무","추가취업및전직희망",n_list)
+  n_list <- gsub("주된일_주업실제취업시간","주업시간",n_list)
+  n_list <- gsub("총실제취업시간","총취업시간",n_list)
+  n_list <- gsub("지난4주내구직여부","지난4주간구직여부",n_list)
+  n_list <- gsub("구직가능성","취업가능성_실업",n_list)
+  n_list <- gsub("교육정도_계열","계열",n_list)
+  n_list <- gsub("계열_교육정도","계열",n_list)
+  n_list <- gsub("신산업","산업",n_list)
+  n_list <- gsub("신직업","직업",n_list)
+  n_list <- gsub("조사년월일","조사년월",n_list)
+  n_list <- gsub("지난주주된활동상태","활동상태",n_list)
+  n_list <- gsub("직장을구하지않는이유","직장을구하지않은이유",n_list)
+  n_list <- gsub("고용계약기간여부","고용계약여부",n_list)
+  n_list <- gsub("지난일주간취업여부","취업여부",n_list)
+  n_list <- gsub("지난주취업여부","취업여부",n_list)
+  n_list <- gsub("시급제보수액","시급제임금",n_list)
+  n_list <- gsub("시급제월급","시급제임금",n_list)
+  n_list <- gsub("취직가능성유무","취직가능성유무_비경활",n_list)
+  n_list <- gsub("취업가능성유무","취직가능성유무_비경활",n_list)
+  n_list <- gsub("구직의사유무","취업희망여부",n_list)
+  
+  n_list <- gsub("전일제시간제시간" , "평소시간" , n_list)
+  n_list <- gsub("시간제주된이유" , "시간제이유" , n_list)
+  n_list <- gsub("시간제근로정해진이유" , "시간제이유" , n_list)
+  n_list <- gsub("전일제일자리를구할수없어서" , "시간제이유" , n_list)
+  n_list <- gsub("건강보험_직장의료보험" , "건강보험" , n_list)
+  n_list <- gsub("퇴직급여_퇴직금,퇴직연금" , "퇴직금" , n_list)
+  n_list <- gsub("퇴직급여" , "퇴직금" , n_list)
+  n_list <- gsub("근로계약서작성여부" , "근로계약작성여부" , n_list)
+  n_list <- gsub("유연근무제활용여부" , "유연근무제활용" , n_list)
+  n_list <- gsub("유연근무제_1_복수응답2자리" , "유연근무제활용형태1" , n_list)
+  n_list <- gsub("유연근무제_2_복수응답2자리" , "유연근무제활용형태2" , n_list)
+  n_list <- gsub("향후활용할유연근무제형태_" , "향후유연근무제활용형태" , n_list)
+  n_list <- gsub("향후유연근무제활용형태_" , "향후유연근무제활용형태" , n_list)
+  n_list <- gsub("_복수응답2자리" , "" , n_list)
+  n_list <- gsub("종사상규모" , "종사자규모" , n_list)
+  n_list <- gsub("교육정도_학력" , "교육정도" , n_list)
+  n_list <- gsub("일주간구직여부_취업판단항목" , "일주간구직여부" , n_list)
+  n_list <- gsub("1년이하인경우_개월" , "년이하인경우_개월" , n_list)
+  
+  names(rslt) <- n_list
+  assign(dfnames[i],as.data.frame(rslt))
+}
+
+# type2007 <- type2007[-28]
+names(type2014)[14] <- "지난4주내추가취업구직여부" 
+```
+```{r}
+merge_names <- list()
+for(i in 1:length(dfnames)){
+  merge_names[i] <- list(names(get(dfnames[i])))
+}
+grepl_ <- function(DF){DF[grepl("시간",DF)]};lapply(merge_names, grepl_)
+
+```
+```{r}
+for(i in 1:7){
+  rslt <- as.data.frame(get(dfnames[i]))
+  names(rslt) <- gsub("고용시근로기간을정했나","고용계약기간",names(rslt))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+for(i in 6:7){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt["고용계약기간"] <- as.numeric(unlist(rslt["고용계약기간"]))
+  rslt <- rslt %>% mutate(고용계약기간 = 고용계약기간*10,
+                          고용계약기간 = ifelse(고용계약기간==10,1,
+                                                ifelse(고용계약기간==20&근로기간이2인경우==1,2,
+                                                             ifelse(고용계약기간==20&근로기간이2인경우==2,3,
+                                                                          ifelse(고용계약기간>20,고용계약기간/10+1,0)))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+type2014 <- type2014 %>% mutate(고용계약기간=as.numeric(고용계약기간),
+                                    고용계약기간 = 고용계약기간*10,
+                                    고용계약기간 = ifelse(고용계약기간==10,1,
+                                                ifelse(고용계약기간==20&고용계약기간이2인경우==1,2,
+                                                             ifelse(고용계약기간==20&고용계약기간이2인경우==2,3,
+                                                                          ifelse(고용계약기간>20,고용계약기간/10+1,0)))),
+                                    고용계약여부 = 고용시근로기간을정했나)
+type2007 <- type2007 %>% mutate(고용계약기간= 고용계약기간*10,
+                                                    고용계약기간 = ifelse(고용계약기간==10,1, #1개월 미만
+                                                                          ifelse(고용계약기간==20,8, # 1개월 이상~ 1년미만
+                                                                                       ifelse(고용계약기간==30,4, #1년
+                                                                                                    ifelse(고용계약기간==40&조사년월%%100<7,9, # 1년초과~3년이하
+                                                                                                                 ifelse(고용계약기간==50&조사년월%%100<7,7, # 3년초과
+                                                                                                                              ifelse(고용계약기간==40&조사년월%%100>6,10, # 1년초과~2년이하 - 2007년 7월~12월
+                                                                                                                                           ifelse(고용계약기간==50&조사년월%%100>6,11,0)))))))) # 2년초과
+
+for(i in 2:5){
+  rslt <- as.data.frame(get(dfnames[i]))
+  rslt <- rslt %>% mutate(고용계약기간 = as.numeric(고용계약기간),
+                                고용계약기간 = 고용계약기간 * 10,
+                                고용계약기간 = ifelse(고용계약기간==10,1,
+                                                      ifelse(고용계약기간==20,8,
+                                                                   ifelse(고용계약기간>20,고용계약기간/10+1,0))))
+  assign(dfnames[i],as.data.frame(rslt))
+}
+```
+
+```{r}
+grepl_ <- function(DF){DF[grepl("평소시간",DF)]};lapply(merge_names, grepl_)
+```
+
+
+```{r}
+varlist <- list()
+for(i in 1:10){
+  varlist[[i]] <- c("조사년월","성별","만나이","출생년도","혼인상태","가중치_Weight","취업여부","경제활동상태구분","종사상지위","종사자규모",
+                    "교육정도","수학여부","졸업년도","계열","활동상태","가구주관계","직장을구하지않은이유","직장시작시기",'추가취업및전직희망',
+                    "주업시간","총취업시간","지난4주간구직여부","취업가능성_실업","고용계약여부","고용계약기간",
+                    
+                    "계약기간반복갱신여부","단기근로기간형태","계속근로가능여부","계속근로가능여부_이유","향후기대근속기간","년이하인경우_개월","근속기간제한이유",
+                    "근로시간형태","평소시간","급여받은곳","특수고용여부","가정내근로여부","국민연금또는특수직연금","건강보험","고용보험","퇴직금","상여금",
+                    "시간외수당","노동조합가입여부","최근3개월간임금",
+                    
+                    "취직가능성유무_비경활","취업희망여부","전직유무")
+}
+
+varlist2007 <- c("산업_9차","직업_6차")
+varlist2008 <- c("산업_9차","직업_6차")
+varlist2009 <- c("산업_9차","직업_6차")
+varlist2010 <- c("산업_9차","직업_6차","시급제임금")
+varlist2011 <- c("산업_9차","직업_6차","시급제임금")
+varlist2012 <- c("산업_9차","직업_6차","시급제임금","추가취업가능성")
+varlist2013 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성")
+varlist2014 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부")
+varlist2015 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부","이직시기_연월")
+varlist2016 <- c("산업_9차","산업_10차","직업_6차","직업_7차","시급제임금","추가취업가능성","지난4주내추가취업구직여부","이직시기_연월")
+
+
+for(i in 1:10){
+  varlist[[i]] <- c(varlist[[i]],get(paste0("varlist",i+2006)))
+}
+```
+
+
+
+
+```{r}
+for(i in 1:10){
+  rslt <- as.data.frame(get(dfnames[i]))
+  colsnames <- unlist(varlist[[i]])
+  rslt <- rslt %>% select(colsnames)
+  assign(paste0("main",i+2006),rslt)
+}
+```
+
+```{r}
+mnames <- c()
+for(i in 2007:2018){
+  mnames <- c(mnames,paste0("main",i))
+}
+unique(main2007$취업여부)
+```
+
+```{r}
+
+main2007 <- main2007 %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+main2007 <- main2007 %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                     가중치 = as.numeric(가중치_Weight)/1000,
+                                     한시적근로자 = ifelse(((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                      ifelse(!((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                      기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                            ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                      시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                            ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                      파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                          ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,NA)),
+                                      정규직 = 1 - 비정규직
+                                      )
+
+for(i in 2:8){
+  rslt <- as.data.frame(get(mnames[i]))
+  rslt <- rslt %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+  rslt <- rslt %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                     가중치 = as.numeric(가중치_Weight)/1000,
+                                     한시적근로자 = ifelse(((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                      ifelse(!((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                      기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                            ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                      시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                            ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                      파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                          ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,NA)),
+                                      정규직 = 1 - 비정규직
+                                      )
+  assign(mnames[i],rslt)
+}
+for(i in 9:10){
+  rslt <- as.data.frame(get(mnames[i]))
+  rslt <- rslt %>% mutate(근속기간제한이유 = as.numeric(근속기간제한이유))
+  rslt <- rslt %>% mutate(임금근로자 = ifelse(종사상지위>=1&종사상지위<=3&경제활동상태구분==1,1,0),
+                                     가중치 = as.numeric(가중치_Weight)/1000,
+                                     한시적근로자 = ifelse(((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),1,
+                                                      ifelse(!((고용계약여부==1)|
+                                                  (고용계약여부==2&계속근로가능여부_이유==2)|
+                                                  (고용계약여부==2&계속근로가능여부==2&(근속기간제한이유>0&근속기간제한이유<7)))&(임금근로자==1),0,NA)),
+                                      기간제근로자 = ifelse(고용계약기간==0&(임금근로자==1),1,
+                                                            ifelse((고용계약기간!=0&(임금근로자==1)),0,NA)),
+                                      시간제근로자 = ifelse(근로시간형태==2&(임금근로자==1),1,
+                                                            ifelse((근로시간형태!=2&(임금근로자==1)),0,NA)),
+                                      파견근로자 = ifelse(급여받은곳==2&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=2&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      용역근로자 = ifelse(급여받은곳==3&(종사상지위>0&종사상지위<4),1,
+                                                          ifelse((급여받은곳!=3&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      특수고용근로자 = ifelse(특수고용여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((특수고용여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      가정내근로자 = ifelse(가정내근로여부==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((가정내근로여부!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      일일근로자 = ifelse(단기근로기간형태==1&(종사상지위>0&종사상지위<4),1,
+                                                             ifelse((단기근로기간형태!=1&(종사상지위>0&종사상지위<4)),0,NA)),
+                                      비정규직 = ifelse(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1,1,
+                                                          ifelse(!(한시적근로자==1|시간제근로자==1|파견근로자==1|용역근로자==1|특수고용근로자==1|가정내근로자==1|일일근로자==1)&(임금근로자==1),0,NA)),
+                                      정규직 = 1 - 비정규직
+                                      )
+  assign(mnames[i],rslt)
+}
+
+for(i in 4:10){
+  rslt <- as.data.frame(get(mnames[i]))
+  rstl <- rslt %>% mutate(시급제임금 = as.numeric(시급제임금))
+  assign(mnames[i],rslt)
+}
+# for(i in 1:8){
+#   rslt <- as.data.frame(get(mnames[i]))
+#   rslt <- rslt %>% mutate(종사상지위 = ifelse())
+#   assign(mnames[i],rslt)
+# }
+```
+
+```{r}
+rm(list=ls(pattern = "type[0-9]"))
+```
+
+
+
+
+```{r}
+main_df <- rbind.fill(main_df,main2007)
+rm(list=c("main2007"))
+for(i in 2:10){
+  main_df <- rbind.fill(main_df,as.data.frame(get(paste0("main",i+2006))))
+  rm(list=paste0("main",i+2006))
+}
+
+
+main_df$향후일자리계획 <- ifelse(main_df$종사상지위<4,NA,main_df$향후일자리계획)
+
+
+# main_df$조사년월[main_df$조사년월=="030815"] <- "200308"
+main_df$조사년월 <- as.numeric(main_df$조사년월)
+main_df$만나이 <- as.numeric(main_df$만나이)
+main_df$졸업년도 <- as.numeric(main_df$졸업년도)
+main_df$졸업년도 <- ifelse(main_df$졸업년도==0,NA,main_df$졸업년도)
+main_df$계열 <- as.numeric(main_df$계열)
+main_df$활동상태 <- as.numeric(main_df$활동상태)
+main_df$직장을구하지않은이유 <- as.numeric(main_df$직장을구하지않은이유)
+main_df$직장시작시기 <- as.numeric(main_df$직장시작시기)
+main_df$직장시작시기 <- ifelse(main_df$직장시작시기==0,NA,main_df$직장시작시기)
+
+main_df$주업시간 <- as.numeric(main_df$주업시간)
+main_df$총취업시간 <- as.numeric(main_df$총취업시간)
+main_df$년이하인경우_개월 <- as.numeric(main_df$년이하인경우_개월)
+main_df$년이하인경우_개월 <- ifelse(main_df$년이하인경우_개월==0,NA,main_df$년이하인경우_개월)
+main_df$근속기간제한이유 <- as.numeric(main_df$근속기간제한이유)
+main_df$근속기간제한이유 <- ifelse(main_df$근속기간제한이유==0&main_df$종사상지위>3,NA,main_df$근속기간제한이유)
+
+main_df$국민연금또는특수직연금 <- as.numeric(main_df$국민연금또는특수직연금)
+main_df$건강보험 <- as.numeric(main_df$건강보험)
+main_df$고용보험 <- as.numeric(main_df$고용보험)
+main_df$퇴직금 <- as.numeric(main_df$퇴직금)
+main_df$상여금 <- as.numeric(main_df$상여금)
+main_df$시간외수당 <- as.numeric(main_df$시간외수당)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+
+main_df$이직시기_연월 <- as.numeric(main_df$이직시기_연월)
+main_df$유급휴가 <- as.numeric(main_df$유급휴가)
+main_df$주된취업사유 <- as.numeric(main_df$주된취업사유)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+main_df$최근3개월간임금 <- as.numeric(main_df$최근3개월간임금)
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님\\코어 데이터 - 경활 본조사 및 부가조사\\경활 부가조사\\데이터_raw")
+write_dta(main_df,"경활 부가조사데이터_raw.dta")
+```
+
+
+```{r}
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님\\코어 데이터 - 경활 본조사 및 부가조사\\경활 부가조사\\데이터_raw")
+write_dta(main_df,"경활 부가조사데이터_raw.dta")
+```
+```{r}
+table(main_df$조사년월,main_df$정규직)
+```
+
