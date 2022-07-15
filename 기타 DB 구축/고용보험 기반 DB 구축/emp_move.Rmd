@@ -1,0 +1,260 @@
+---
+title: "Untitled"
+author: "Hyundo Im"
+date: '2022 5 11 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+library(plyr)
+library(readxl)
+library(tidyverse)
+library(data.table)
+library(haven)
+library(labelled)
+library(stringr)
+
+```
+```{r}
+rm(list=ls())
+```
+
+```{r}
+setwd("rsc\\")
+list_files <- list.files(pattern = "이동현황")
+2021:2013
+```
+```{r message=FALSE,warning=FALSE}
+main_df <- data.frame(year = NA,
+                      ind_current = NA,
+                      sido_current = NA,
+                      prior = NA,
+                      move = NA)
+years <- 2021:2013
+# i <- 1
+for(i in 1:length(list_files)){
+  
+  tmp <- read_excel(paste0("rsc\\",list_files[i]),
+                    skip = 11) %>% as.matrix()
+  tmp_colnames1 <- colnames(tmp)
+  tmp_colnames1[c(1,2)] <- c("ind_current","sido_current")
+  tmp_colnames1 <- gsub("...[0-9]",NA,tmp_colnames1)
+  for(j in 2:length(tmp_colnames1)){
+    tmp_colnames1[j] <- ifelse(is.na(tmp_colnames1[j]),tmp_colnames1[j-1],tmp_colnames1[j])
+  }
+  tmp_colnames2 <- unlist(tmp[1,])
+  tmp_colnames2 <- ifelse(is.na(tmp_colnames2),"",paste0(".",tmp_colnames2))
+  
+  tmp_colnames <- paste0(tmp_colnames1,tmp_colnames2)
+  tmp <- read_excel(paste0("rsc\\",list_files[i]),
+                    skip = 13)
+  names(tmp) <- tmp_colnames
+  tmp <- tmp %>% 
+    fill(ind_current)
+  tmp <- tmp %>% 
+    mutate(sido_current = ifelse(is.na(sido_current),"전체",sido_current))
+  tmp_long <- gather(tmp,
+         key = 'prior',
+         value = 'move',
+         tmp_colnames[3:length(tmp_colnames)])
+  tmp_long <- tmp_long %>% mutate(year = years[i])
+  main_df <- rbind(main_df,tmp_long)
+  
+}
+main_df <- main_df[-1,]
+
+add_df <- data.frame(do.call("rbind",strsplit(main_df$prior,".",fixed = TRUE)))
+add_df$X2 <- ifelse(add_df$X1==add_df$X2,"전체",add_df$X2)
+names(add_df) <- c("ind_prior","sido_prior")
+main_df <- cbind(main_df,add_df)
+main_df <- main_df %>% 
+  select(-prior)
+main_df <- main_df %>% 
+  mutate(ind_current = gsub(" ","",gsub("전체","",ind_current)),
+         ind_prior = gsub(" ","",gsub("전체","",ind_prior)))
+```
+```{r}
+unique(main_df$ind_current);unique(main_df$ind_prior)
+unique(main_df$sido_current);unique(main_df$sido_prior)
+```
+
+```{r}
+
+main_df <- main_df %>% 
+  mutate(
+    ind_current = gsub("10차_","",gsub("09차_","",ind_current)),
+    ind_prior = gsub("10차_","",gsub("09차_","",ind_prior))
+  )
+main_df <- main_df %>% 
+  mutate(
+    ind_current = ifelse(grepl("전기",ind_current),"전기,가스,증기및공기조절공급업",
+                  ifelse(grepl("통신",ind_current),"정보통신업",
+                    ifelse(grepl("부동산",ind_current),"부동산업",
+                      ifelse(grepl("하수",ind_current),"수도,하수및폐기물처리,원료재생업",
+                        ifelse(grepl("운수",ind_current),"운수및창고업",
+                          ifelse(grepl("사업시설",ind_current),"사업시설관리,사업지원및임대서비스업",ind_current)))))),
+    ind_prior = ifelse(grepl("전기",ind_prior),"전기,가스,증기및공기조절공급업",
+                  ifelse(grepl("통신",ind_prior),"정보통신업",
+                    ifelse(grepl("부동산",ind_prior),"부동산업",
+                      ifelse(grepl("하수",ind_prior),"수도,하수및폐기물처리,원료재생업",
+                        ifelse(grepl("운수",ind_prior),"운수및창고업",
+                          ifelse(grepl("사업시설",ind_prior),"사업시설관리,사업지원및임대서비스업",ind_prior))))))
+
+  )
+main_df <- main_df %>% filter(ind_current!="총계"&ind_prior!="총계")
+# unique(main_df$ind_cur_m)
+```
+```{r}
+target_full <- unique(main_df$ind_current)
+target_s <- unique(main_df$ind_cur_m)
+query <- "사업시설관리"
+target_s[grepl(query,target_s)]
+target_full[grepl(query,target_full)]
+```
+```{r}
+target_full <- unique(main_df$ind_prior)
+target_s <- unique(main_df$ind_prior_m)
+query <- "예술"
+target_s[grepl(query,target_s)]
+target_full[grepl(query,target_full)]
+```
+```{r}
+indlist <- read_excel("rsc\\ind_large.xlsx")
+indlist$code <- gsub("[(][0-9]{2}~[0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub("[(][0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub(" ","",indlist$code)
+# indlist[22,] <- c(99,"분류불능")
+# table(main_df$year,
+#       main_df$ind_current)
+indlist[22,1] <- 99
+indlist[22,2] <- "분류불능"
+# indlist[23,1] <- 100
+# indlist[23,2] <- "총계"
+```
+
+```{r}
+main_df <- main_df %>% 
+  mutate(ind_prior = factor(ind_prior,
+                              levels = indlist$code))
+main_df <- main_df %>% 
+  mutate(ind_current = factor(ind_current,
+                              levels = indlist$code))
+length(unique(main_df$ind_prior))
+```
+```{r}
+write_dta(main_df,"data\\cleaning.dta")
+```
+```{r}
+main_df <- read_dta("data\\cleaning.dta")
+# rm(list=c("cleaning_df"))
+```
+```{r}
+main_df <- main_df %>% 
+  mutate(ind_cur_m = ifelse(ind_current<3,1,
+                      ifelse(ind_current==3,3,
+                        ifelse(ind_current<6,99,
+                          ifelse(ind_current==6,6,
+                            ifelse(ind_current==7,7,
+                              ifelse(ind_current==8,8,
+                                ifelse(ind_current==9,9,
+                                  ifelse(ind_current==10,10,
+                                    ifelse(ind_current==11,11,
+                                      ifelse(ind_current==12,12,
+                                        ifelse(ind_current==13,13,
+                                          ifelse(ind_current==14,14,
+                                            ifelse(ind_current%in%16:18,99,
+                                                  ifelse(ind_current==19,19,NA)))))))))))))))
+main_df <- main_df %>% 
+  mutate(ind_prior_m = ifelse(ind_prior<3,1,
+                      ifelse(ind_prior==3,3,
+                        ifelse(ind_prior<6,99,
+                          ifelse(ind_prior==6,6,
+                            ifelse(ind_prior==7,7,
+                              ifelse(ind_prior==8,8,
+                                ifelse(ind_prior==9,9,
+                                  ifelse(ind_prior==10,10,
+                                    ifelse(ind_prior==11,11,
+                                      ifelse(ind_prior==12,12,
+                                        ifelse(ind_prior==13,13,
+                                          ifelse(ind_prior==14,14,
+                                            ifelse(ind_prior%in%16:18,99,
+                                                  ifelse(ind_prior==19,19,NA)))))))))))))))
+```
+```{r}
+main_df$ind_cur_m <- factor(main_df$ind_cur_m,
+                            levels = indlist$value,
+                            labels = indlist$code)
+main_df$ind_prior_m <- factor(main_df$ind_prior_m,
+                            levels = indlist$value,
+                            labels = indlist$code)
+```
+```{r}
+# write_dta(main_df,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\일자리이동\\job_move.dta")
+```
+```{r}
+unique(main_df$sido_current);unique(main_df$sido_prior)
+```
+```{r}
+main_df$sido_current <- recode(main_df$sido_current,
+         "서울"="서울특별시","부산"="부산광역시","대구"="대구광역시","인천"="인천광역시","광주"="광주광역시","대전"="대전광역시","울산"="울산광역시",
+         "세종"="세종특별자치시","경기"="경기도","강원"="강원도","충북"="충청북도","충남"="충청남도","전북"="전라북도","전남"="전라남도",
+         "경북"="경상북도","경남"="경상남도","제주"="제주도")
+main_df$sido_prior <- recode(main_df$sido_prior,
+         "서울"="서울특별시","부산"="부산광역시","대구"="대구광역시","인천"="인천광역시","광주"="광주광역시","대전"="대전광역시","울산"="울산광역시",
+         "세종"="세종특별자치시","경기"="경기도","강원"="강원도","충북"="충청북도","충남"="충청남도","전북"="전라북도","전남"="전라남도",
+         "경북"="경상북도","경남"="경상남도","제주"="제주도")
+```
+```{r}
+sidolist <- data.frame(value=1:19,
+                       labels = c("서울특별시","부산광역시","대구광역시","인천광역시","광주광역시","대전광역시","울산광역시","세종특별자치시","경기도","강원도","충청북도","충청남도","전라북도","전라남도","경상북도","경상남도","제주도","분류불능","전체"))
+main_df <- main_df %>% 
+  mutate(sido_current = factor(sido_current,
+                               levels = sidolist$labels),
+         sido_prior = factor(sido_prior,
+                             levels = sidolist$labels))
+```
+```{r}
+write_dta(main_df,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\일자리이동\\job_move.dta")
+```
+```{r}
+var_label(main_df) <- c("년도","현재 산업: 10차산업 통일","현재 지역 시도",
+                        "이동 수", "이전 산업: 10차산업 통일","이전 지역 시도",
+                        "현재 산업: 정보화통계조사 연결용",
+                        "이전 산업: 정보화통계조사 연결용")
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+

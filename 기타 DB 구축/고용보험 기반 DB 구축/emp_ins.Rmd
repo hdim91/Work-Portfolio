@@ -1,0 +1,266 @@
+---
+title: "Untitled"
+author: "Hyundo Im"
+date: '2022 5 17 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r message=FALSE,warning=FALSE}
+library(plyr)
+library(readxl)
+library(tidyverse)
+library(data.table)
+library(haven)
+library(labelled)
+library(stringr)
+
+```
+```{r}
+memory.limit(16000)
+rm(list=ls())
+```
+
+```{r}
+setwd("rsc\\")
+list_files <- list.files(pattern = "피보험자")
+2021:2013
+```
+```{r message=FALSE,warning=FALSE}
+main_df <- data.frame(year = NA,
+                      ind_L = NA,
+                      ind_M = NA,
+                      size = NA,
+                      sido = NA,
+                      insured = NA)
+years <- 2021:2012
+# i <- 1
+for(i in 1:length(list_files)){
+  
+  tmp <- read_excel(paste0("rsc\\",list_files[i]),
+                    skip = 13) 
+  tmp_colnames1 <- colnames(tmp)
+  tmp_colnames1[1:5] <- c("ind_L","ind_M","size","sido","insured")
+  tmp <- tmp[,1:5]
+  names(tmp) <- tmp_colnames1
+  tmp$year <- years[i]
+  main_df <- rbind(main_df,tmp)
+  
+}
+main_df <- main_df[-1,]
+main_df <- main_df %>% 
+  fill(ind_L,ind_M,size)
+main_df[is.na(main_df)] <- "전체"
+```
+```{r}
+main_df <- main_df %>% filter(sido!="전체")
+
+main_df <- main_df %>% 
+  mutate(ind_L = gsub("10차_","",gsub("09차_","",ind_L)),
+    ind_M = gsub("10차_","",gsub("09차_","",ind_M)))
+main_df <- main_df %>% 
+  mutate(
+    ind_L_aggregate = ifelse(grepl("전기",ind_L),"전기,가스,증기및공기조절공급업",
+                  ifelse(grepl("통신",ind_L),"정보통신업",
+                    ifelse(grepl("부동산",ind_L),"부동산업",
+                      ifelse(grepl("하수",ind_L),"수도,하수및폐기물처리,원료재생업",
+                        ifelse(grepl("운수",ind_L),"운수및창고업",
+                          ifelse(grepl("사업시설",ind_L),"사업시설관리,사업지원및임대서비스업",ind_L))))))
+  )
+main_df <- main_df %>% mutate(ind_L_aggregate = gsub(" ","",ind_L_aggregate))
+unique(main_df$ind_L_aggregate)
+```
+```{r}
+indlist <- read_excel("rsc\\ind_large.xlsx")
+indlist$code <- gsub("[(][0-9]{2}~[0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub("[(][0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub(" ","",indlist$code)
+
+# indlist[22,1] <- 99
+# indlist[22,2] <- "분류불능"
+```
+```{r}
+main_df <- main_df %>% mutate(ind_L_aggregate = factor(ind_L_aggregate,levels = indlist$code))
+sidolist <- unique(main_df$sido)
+sizelist <- unique(main_df$size)
+sizelist <- sizelist[c(1:8,10:12)]
+main_df <- main_df %>% mutate(size = factor(size,levels = sizelist))
+main_df <- main_df %>% mutate(sido = factor(sido,levels = sidolist))
+var_label(main_df) <- c("년도","산업대분류_비분류","산업중분류","규모","시도","피보험자 수","산업대분류_분류됨")
+```
+```{r}
+write_dta(main_df,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\일자리이동\\피보험자.dta")
+```
+
+```{r}
+setwd("rsc\\applied\\")
+list_files <- list.files(pattern = "피보험자")
+# 2021:2013
+
+applied_df <- data.frame(year = NA,
+                      ind_L = NA,
+                      ind_M = NA,
+                      size = NA,
+                      sido = NA,
+                      added = NA,
+                      expired=NA)
+years <- 2021:2013
+# i <- 1
+for(i in 1:length(list_files)){
+  
+  tmp <- read_excel(list_files[i],
+                    skip = 13) 
+  tmp_colnames <- c("ind_L","ind_M","size","sido","added","expired")
+  tmp <- tmp[,c(1:4,6,7)]
+  names(tmp) <- tmp_colnames
+  tmp$year <- years[i]
+  applied_df <- rbind(applied_df,tmp)
+  
+}
+applied_df <- applied_df[-1,]
+applied_df <- applied_df %>% 
+  fill(ind_L,ind_M,size)
+applied_df[is.na(applied_df)] <- "전체"
+```
+```{r}
+applied_df <- applied_df %>% filter(sido!="전체")
+
+applied_df <- applied_df %>% 
+  mutate(ind_L = gsub("10차_","",gsub("09차_","",ind_L)),
+    ind_M = gsub("10차_","",gsub("09차_","",ind_M)))
+applied_df <- applied_df %>% 
+  mutate(
+    ind_L_aggregate = ifelse(grepl("전기",ind_L),"전기,가스,증기및공기조절공급업",
+                  ifelse(grepl("통신",ind_L),"정보통신업",
+                    ifelse(grepl("부동산",ind_L),"부동산업",
+                      ifelse(grepl("하수",ind_L),"수도,하수및폐기물처리,원료재생업",
+                        ifelse(grepl("운수",ind_L),"운수및창고업",
+                          ifelse(grepl("사업시설",ind_L),"사업시설관리,사업지원및임대서비스업",ind_L))))))
+  )
+applied_df <- applied_df %>% mutate(ind_L_aggregate = gsub(" ","",ind_L_aggregate))
+```
+```{r}
+indlist <- read_excel("rsc\\ind_large.xlsx")
+indlist$code <- gsub("[(][0-9]{2}~[0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub("[(][0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub(" ","",indlist$code)
+
+# indlist[22,1] <- 99
+# indlist[22,2] <- "분류불능"
+```
+```{r}
+applied_df <- applied_df %>% mutate(ind_L_aggregate = factor(ind_L_aggregate,levels = indlist$code))
+# applied_df <- applied_df %>% mutate(size = factor(size,
+#                                                   ))
+
+```
+```{r}
+applied_df <- applied_df %>% mutate(sido = factor(sido,levels = sidolist))
+applied_df <- applied_df %>% mutate(size = factor(size,levels = sizelist))
+var_label(applied_df) <- c("년도","산업대분류_비분류","산업중분류","규모","시도","취득자 수","상실자 수","산업대분류_분류됨")
+write_dta(applied_df,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\일자리이동\\취득자 및 상실자.dta")
+```
+```{r}
+
+```
+```{r}
+applied_df %>% group_by(year,ind_L_aggregate,ind_L,size,sido) %>% 
+  summarise(added = sum(added,na.rm=TRUE))
+```
+
+
+
+
+
+```{r}
+setwd("rsc\\applied_type\\")
+list_files <- list.files(pattern = "피보험자")
+# 2021:2013
+
+type_df <- data.frame(year = NA,
+                      ind_L = NA,
+                      type = NA,
+                      size = NA,
+                      sido = NA,
+                      acquired = NA,
+                      expired=NA)
+years <- 2021:2013
+# i <- 1
+for(i in 1:length(list_files)){
+  
+  tmp <- read_excel(list_files[i],
+                    skip = 13) 
+  tmp_colnames <- c("ind_L","type","size","sido","acquired","expired")
+  tmp <- tmp[,c(1:4,6,7)]
+  names(tmp) <- tmp_colnames
+  tmp$year <- years[i]
+  type_df <- rbind(type_df,tmp)
+  
+}
+type_df <- type_df[-1,]
+type_df <- type_df %>% 
+  fill(ind_L,type,size)
+type_df[is.na(type_df)] <- "전체"
+```
+```{r}
+type_df <- type_df %>% 
+  mutate(ind_L = gsub("10차_","",gsub("09차_","",ind_L)))
+type_df <- type_df %>% 
+  mutate(
+    ind_L_aggregate = ifelse(grepl("전기",ind_L),"전기,가스,증기및공기조절공급업",
+                  ifelse(grepl("통신",ind_L),"정보통신업",
+                    ifelse(grepl("부동산",ind_L),"부동산업",
+                      ifelse(grepl("하수",ind_L),"수도,하수및폐기물처리,원료재생업",
+                        ifelse(grepl("운수",ind_L),"운수및창고업",
+                          ifelse(grepl("사업시설",ind_L),"사업시설관리,사업지원및임대서비스업",ind_L))))))
+  )
+type_df <- type_df %>% mutate(ind_L_aggregate = gsub(" ","",ind_L_aggregate))
+expired_df <- type_df %>% select(-acquired)
+expired_df <- expired_df %>% filter(expired>0) %>% filter(ind_L!="총계")
+expired_df <- expired_df %>% filter(sido!="전체")
+expired_df <- expired_df %>% select(-type)
+type_df <- type_df %>% filter(sido!="전체")
+# unique(type_df$type)
+```
+```{r}
+indlist <- read_excel("rsc\\ind_large.xlsx")
+indlist$code <- gsub("[(][0-9]{2}~[0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub("[(][0-9]{2}[)]","",indlist$code)
+indlist$code <- gsub(" ","",indlist$code)
+
+# indlist[22,1] <- 99
+# indlist[22,2] <- "분류불능"
+```
+```{r}
+sidolist <- unique(type_df$sido)
+sizelist <- unique(type_df$size)
+sizelist <- sizelist[c(1:10,12)]
+type_df <- type_df %>% mutate(ind_L_aggregate = factor(ind_L_aggregate,levels = indlist$code))
+type_df <- type_df %>% mutate(sido = factor(sido,levels = sidolist))
+type_df <- type_df %>% mutate(size = factor(size,levels = sizelist))
+type_df <- type_df %>% select(-expired)
+type_df <- type_df %>% filter(type!="해당없음")
+type_df <- type_df %>% filter(type!="분류불능")
+```
+```{r}
+type_sum <- type_df %>% data.table::dcast(year+ind_L_aggregate+ind_L+size+sido~type,value.var="acquired",fun=mean)
+names(type_sum)[6:7] <- c("new","existing")
+type_sum <- type_sum %>% mutate(new = ifelse(is.nan(new),0,new),
+                                existing = ifelse(is.nan(existing),0,existing))
+# type_df %>% filter(year==2013);type_sum
+```
+```{r}
+type_sum <- type_sum %>% mutate(acquired = new + existing)
+type_whole <- type_sum %>% left_join(expired_df,by=c("year","ind_L_aggregate","ind_L","size","sido"))
+type_whole <- type_whole %>% mutate(ind_L_aggregate = factor(ind_L_aggregate,levels = indlist$code))
+type_whole <- type_whole %>% mutate(sido = factor(sido,levels = sidolist))
+type_whole <- type_whole %>% mutate(size = factor(size,levels = sizelist))
+type_sum;expired_df
+```
+```{r}
+var_label(type_whole) <- c("년도","산업대분류_분류됨","산업대분류","규모","시도","신규취득자 수","재취득자 수","취득자 수","상실자 수")
+write_dta(type_whole,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\일자리이동\\취득자 및 상실자 - 신규 및 재취득자 구분.dta")
+```
+
