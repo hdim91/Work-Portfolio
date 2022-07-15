@@ -1,0 +1,302 @@
+---
+title: "가계금융복지조사 Tabulation - 자영업자 가구주"
+author: ""
+date: '2020-7-6 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+library(plyr)
+library(tidyverse)
+library(readxl)
+library(readr)
+library(haven)
+library(xlsx)
+library(psych)
+library(zoo)
+library(Hmisc)
+library(stringr)
+library(expss) #cro()
+library(ggthemes)
+library(spatstat)
+rm(list=ls())
+
+rslt_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+dta_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\데이터\\"
+
+ind10 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="ind10")
+job7 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="job7")
+code10 <- unlist(ind10$코드)
+name10 <- unlist(ind10$항목명)
+code7 <- unlist(job7$코드)
+name7 <- unlist(job7$항목명)
+
+ind9 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="ind9")
+code9 <- unlist(ind9$코드)
+name9 <- unlist(ind9$항목명)
+
+main <- read_dta(paste0(dta_wd,"2019년 가계금융복지조사.dta"))
+main <- as.data.table(main)
+
+
+main[,trans_inc := trans_inc_public+trans_inc_prv]
+attributes(main$trans_inc)$label <- "이전소득_만원"
+
+main_ <- main[hhrank==3|hhrank==4]
+```
+
+```{r echo=FALSE}
+
+print("가구주X동거상태")
+
+cro(as_factor(main_$together),as_factor(main_$married))
+
+print("가구주,동거상태별 X 가구원 수 별 빈도 수")
+
+cro(main_$cnt, list(as_factor(main_$together),as_factor(main_$married),total()))
+
+print("가구주 X 가구원 수, 동거상태별 X 가구원 수 별 상대빈도")
+
+cro_cpct(main_$cnt, list(as_factor(main_$together),as_factor(main_$married),total()))
+
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 노동소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,labor_winc := weighted.mean(labor_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$labor_winc)$label <- "노동소득_만원"
+main_ %>% 
+  tab_cells(labor_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 재산소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,cap_winc := weighted.mean(cap_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$cap_winc)$label <- "재산소득_만원"
+main_ %>% 
+  tab_cells(cap_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 이전소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,trans_winc := weighted.mean(trans_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$trans_winc)$label <- "이전소득_만원"
+main_ %>% 
+  tab_cells(trans_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 사업소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,bus_winc := weighted.mean(bus_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$bus_winc)$label <- "사업소득_만원"
+main_ %>% 
+  tab_cells(bus_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 경상소득 대비 사업소득 비율
+```{r echo = FALSE}
+main_ %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>% 
+  .[,bus_prop := weighted.mean(bus_prop,weight,na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$bus_prop)$label <- "사업소득_비율"
+main_ %>% 
+  tab_cells(bus_prop) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 순자산
+```{r echo = FALSE}
+main_ %>% 
+  .[,net_assetw := weighted.mean(net_asset, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$net_assetw)$label <- "순자산_만원"
+main_ %>% 
+  tab_cells(net_assetw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 자산
+```{r echo = FALSE}
+main_ %>% 
+  .[,assetw := weighted.mean(asset, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$assetw)$label <- "자산_만원"
+main_ %>% 
+  tab_cells(assetw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 부채
+```{r echo = FALSE}
+main_ %>% 
+  .[,debtw := weighted.mean(debt, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$debtw)$label <- "부채_만원"
+main_ %>% 
+  tab_cells(debtw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------------------------------------------
+
+# 아래는 가중중간값
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 노동소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,labor_winc := weighted.median(labor_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$labor_winc)$label <- "노동소득_만원"
+main_ %>% 
+  tab_cells(labor_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 재산소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,cap_winc := weighted.median(cap_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$cap_winc)$label <- "재산소득_만원"
+main_ %>% 
+  tab_cells(cap_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 이전소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,trans_winc := weighted.median(trans_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$trans_winc)$label <- "이전소득_만원"
+main_ %>% 
+  tab_cells(trans_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 사업소득
+```{r echo=FALSE}
+main_ %>% 
+  .[,bus_winc := weighted.median(bus_inc, weight, na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$bus_winc)$label <- "사업소득_만원"
+main_ %>% 
+  tab_cells(bus_winc) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 경상소득 대비 사업소득 비율
+```{r echo = FALSE}
+main_ %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>% 
+  .[,bus_prop := weighted.median(bus_prop,weight,na.rm = TRUE),
+    by = c("cnt","together","married")] 
+attributes(main_$bus_prop)$label <- "사업소득_비율"
+main_ %>% 
+  tab_cells(bus_prop) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 순자산
+```{r echo = FALSE}
+main_ %>% 
+  .[,net_assetw := weighted.median(net_asset, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$net_assetw)$label <- "순자산_만원"
+main_ %>% 
+  tab_cells(net_assetw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 자산
+```{r echo = FALSE}
+main_ %>% 
+  .[,assetw := weighted.median(asset, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$assetw)$label <- "자산_만원"
+main_ %>% 
+  tab_cells(assetw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```
+
+### (동거상태 $\times$ 가구원 수) or (가구주 혼인상태 $\times$ 가구원 수) 별 부채
+```{r echo = FALSE}
+main_ %>% 
+  .[,debtw := weighted.median(debt, weight, na.rm = TRUE),
+    by = c("cnt","together","married")]
+attributes(main_$debtw)$label <- "부채_만원"
+main_ %>% 
+  tab_cells(debtw) %>% 
+  tab_cols(list(as_factor(main_$together),as_factor(main_$married),total())) %>% 
+  tab_rows(cnt) %>% 
+  tab_stat_mean() %>% 
+  tab_pivot()
+```

@@ -1,0 +1,1023 @@
+---
+title: "가계금융복지조사 분석"
+author: "Hyundo Im"
+date: '2020 7 3 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(magrittr)
+library(plyr)
+library(tidyverse)
+library(readxl)
+library(readr)
+library(haven)
+library(xlsx)
+library(psych)
+library(zoo)
+library(Hmisc)
+library(stringr)
+# library(expss) #cro()
+library(ggthemes)
+library(doParallel)
+library(spatstat)
+rm(list=ls())
+```
+
+
+```{r}
+rslt_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+dta_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\데이터\\"
+
+ind10 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="ind10")
+job7 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="job7")
+code10 <- unlist(ind10$코드)
+name10 <- unlist(ind10$항목명)
+code7 <- unlist(job7$코드)
+name7 <- unlist(job7$항목명)
+
+ind9 <- read_excel("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\산업직업.xlsx",sheet="ind9")
+code9 <- unlist(ind9$코드)
+name9 <- unlist(ind9$항목명)
+```
+
+# 가계금융복지조사 재클리닝
+```{r}
+# main <- read_dta(paste0(dta_wd,"2019년 가계금융복지조사.dta"))
+# main <- as.data.table(main)
+# main[,capital := factor(capital, levels = c("G1","G2"), labels = c("수도권", "비수도권"))]
+# main[,hhedu_tot := factor(hhedu_tot, levels = paste0("G",1:4), labels = c("초졸","중졸","고졸","대졸이상"))]
+# main[,hhedu_r := factor(hhedu, levels = 1:8, labels = c("안 받음","초등학교","중학교","고등학교","대학(3년제 이하)","대학(4년제 이상)","석사","박사 이상"))]
+# main[,attend := ifelse(hhgrad==1|hhgrad>3,0,
+#                        ifelse(hhgrad==2|hhgrad==3,1,NA))]
+# main[,hhedu := ifelse(hhedu<5|(hhedu==5&attend==1)|(hhedu==6&attend==1),"고졸이하",
+#                       ifelse(hhedu==5&attend==0,"전문대졸",
+#                              ifelse(hhedu==6&attend==0|hhedu>6,"대졸이상",NA)))]
+# main[,hhind := factor(hhind, levels = code10, labels = name10)]
+# main[,hhjob := factor(hhjob, levels = code7, labels = name7)]
+# main[,hhsex := factor(hhsex, levels = 1:2, labels = c("남성","여성"))]
+# main[,together := factor(together, levels = 1:4, labels = c("1인", "같이 살고 있음", "따로 살고 있음(직장)","따로 살고 있음(학업 등)"))]
+# main[,hhrank := factor(hhrank, levels = 1:7,
+#                        labels = c("상용근로자","임시,일용근로자","고용원 있는 자영업자","고용원 없는 자영업자","무급가족종사자","기타 종사자(실적급,대리 운전사 등)",
+#                                   "기타(무직자,가사,학생 등)"))]
+# main[,married := factor(married, levels = 1:4,
+#                         labels = c("미혼", "배우자있음", "사별", "이혼"))]
+# main[,live_type := factor(live_type, levels = 1:5,
+#                           labels = c("자기집", "전세", "보증금 있는 월세", "보증금 없는 월세", "기타"))]
+# main[,attend := factor(attend, levels = c(0,1), labels = c("졸업/중퇴/수료","재학/휴학"))]
+# attributes(main$year)$label <- "조사년도"
+# attributes(main$hid)$label <- "가구ID"
+# attributes(main$weight)$label <- "가구 가중치"
+# attributes(main$capital)$label <- "수도권 거주유무"
+# attributes(main$hhsex)$label <- "가구주 성별"
+# attributes(main$cnt)$label <- "가구원 수"
+# attributes(main$hhedu)$label <- "가구주 교육수준"
+# attributes(main$hhgrad)$label <- "교육상태"
+# attributes(main$together)$label <- "동거상태"
+# attributes(main$hhind)$label <- "가구주 산업"
+# attributes(main$hhjob)$label <- "가구주 직업"
+# attributes(main$hhage)$label <- "가구주 만나이"
+# attributes(main$hhrank)$label <- "가구주 종사상지위"
+# attributes(main$married)$label <- "가구주 혼인상태"
+# attributes(main$live_type)$label <- "입주형태"
+# attributes(main$asset)$label <- "자산"
+# attributes(main$debt)$label <- "부채"
+# attributes(main$net_asset)$label <- "순자산"
+# attributes(main$dis_inc)$label <- "경상소득(만 원)"
+# attributes(main$labor_inc)$label <- "노동소득(만 원)"
+# attributes(main$bus_inc)$label <- "사업소득(만 원)"
+# attributes(main$cap_inc)$label <- "자산소득(만 원)"
+# attributes(main$trans_inc_public)$label <- "공적이전소득"
+# attributes(main$trans_inc_prv)$label <- "사적이전소득"
+# attributes(main$hhedu_r)$label <- "가구주 교육수준(raw)"
+# attributes(main$attend)$label <- "졸업/중퇴/수료(==1) 및 재학/휴학 구분(==2)"
+# 
+# attributes(main)
+# write_dta(main,paste0(dta_wd,"2019년 가계금융복지조사.dta"))
+```
+
+# 2019년 가계금융복지조사 Import
+```{r}
+main <- read_dta(paste0(dta_wd,"2019년 가계금융복지조사.dta"))
+main <- as.data.table(main)
+# 종사상지위별 재설정
+
+main[,hhrank_ := ifelse(hhrank==1,1,
+                        ifelse(hhrank==2,2,
+                               ifelse(hhrank==3|hhrank==4,3,
+                                      ifelse(hhrank==6,4,NA))))]
+main[, hhrank_ := factor(hhrank_, levels = 1:4, labels = c("상용근로자", "임시,일용근로자","자영업자","기타 종사자"))]
+ranks_ <- levels(main$hhrank_)
+main[,paid := ifelse(labor_inc>bus_inc,1,0)]
+main[,self := ifelse(bus_inc>labor_inc,1,0)]
+
+table(as_factor(main$hhrank))
+mainm <- main[hhsex==1]
+mainf <- main[hhsex==2]
+mainp <- main[paid==1]
+mains <- main[self==1]
+maino <- main[hhrank==6]
+main
+```
+
+
+# 가구주 만나이X성별X교육수준별
+```{r}
+options(scipen = 999)
+list_ <- main %>% 
+  .[,keyby = c("hhsex","hhage","hhedu"),
+    .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+names(list_) <- c("가구주 성별", "가구주 나이", "가구주 교육수준","경상소득","사업소득","근로소득","순자산","자산","부채")
+
+write.xlsx(list_,
+           paste0(rslt_wd,"가구주 기준 소득 및 재산현황.xlsx"),
+           sheet = "가구주 만나이X성별X교육수준별")
+```
+
+# 각 소득 및 자산현황 시각화
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  main[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- main[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의"] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, ".png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(graph_wd, "각 그룹의 연령별 결과.xlsx"), sheet = "사업소득 있는 가구")
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(graph_wd, "각 그룹의 연령별 결과.xlsx"),sheet = paste0(unique(x$가구구분)), 
+             append=TRUE)
+})
+
+table(as_factor(main$married))
+```
+# 남성 가구주
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  mainm[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- mainm[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의"] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\남성 가구주\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 남성" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 남성.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor, " - 남성"),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, " - 남성.png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+file_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(file_wd, "각 그룹의 연령별 결과.xlsx"), sheet = "사업소득 있는 가구 - 남성",
+           append = TRUE)
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(file_wd, "각 그룹의 연령별 결과.xlsx"),sheet = paste0(unique(x$가구구분), " - 남성"), 
+             append=TRUE)
+})
+
+
+```
+
+# 여성 가구주
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  mainf[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- mainf[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의"] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.mean(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+        asset = weighted.mean(asset, weight,na.rm = TRUE),
+        debt = weighted.mean(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\여성 가구주\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 여성" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 여성.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor, " - 여성"),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, " - 여성.png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+file_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(file_wd, "각 그룹의 연령별 결과.xlsx"), sheet = "사업소득 있는 가구 - 여성",
+           append = TRUE)
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(file_wd, "각 그룹의 연령별 결과.xlsx"),sheet = paste0(unique(x$가구구분), " - 여성"), 
+             append=TRUE)
+})
+
+
+```
+
+
+# 가구주 만나이X성별X교육수준별
+```{r}
+options(scipen = 999)
+list_ <- main %>% 
+  .[,keyby = c("hhsex","hhage","hhedu"),
+    .(dis_inc = round(weighted.median(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.median(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.median(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.median(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.median(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.median(debt,weight,na.rm = TRUE),2))]
+names(list_) <- c("가구주 성별", "가구주 나이", "가구주 교육수준","경상소득","사업소득","근로소득","순자산","자산","부채")
+
+write.xlsx(list_,
+           paste0(rslt_wd,"가구주 기준 소득 및 재산현황 - 중간값.xlsx"),
+           sheet = "가구주 만나이X성별X교육수준별")
+```
+
+# 각 소득 및 자산현황 시각화
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  main[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- main[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의" ] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\전체 - 중간값\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, ".png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(graph_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"), sheet = "사업소득 있는 가구")
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(graph_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"),sheet = paste0(unique(x$가구구분)), 
+             append=TRUE)
+})
+
+
+```
+# 남성 가구주
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  mainm[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- mainm[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의" ] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\남성 가구주 - 중간값\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 남성" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 남성.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor, " - 남성"),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, " - 남성.png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+file_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(file_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"), sheet = "사업소득 있는 가구 - 남성",
+           append = TRUE)
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(file_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"),sheet = paste0(unique(x$가구구분), " - 남성"), 
+             append=TRUE)
+})
+
+
+```
+
+# 여성 가구주
+```{r message=FALSE}
+
+# 각 종사상지위별 데이터 클리닝 및 summarization
+
+list_ <- foreach(i = ranks_) %do% {
+  mainf[hhrank_ == i] %>% 
+    .[,bus_prop := bus_inc/dis_inc*100] %>% 
+    .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+}
+
+# 사업소득이 있는 가구를 list_에 추가
+
+length_ <- length(ranks_)+1
+list_[[length_]] <- mainf[bus_inc>0] %>% 
+  .[,bus_prop := bus_inc/dis_inc*100] %>%
+  .[,hhrank_ := "사업소득이 있는 가구의" ] %>% 
+  .[,keyby = c("hhage","hhrank_"),
+      .(dis_inc = weighted.median(dis_inc,weight,na.rm = TRUE),
+        bus_inc = weighted.median(bus_inc,weight,na.rm = TRUE),
+        labor_inc = weighted.median(labor_inc,weight,na.rm = TRUE),
+        cap_inc = weighted.median(cap_inc,weight,na.rm = TRUE),
+        bus_prop = weighted.median(bus_prop,weight,na.rm = TRUE),
+        net_asset = weighted.median(net_asset,weight,na.rm = TRUE),
+        asset = weighted.median(asset, weight,na.rm = TRUE),
+        debt = weighted.median(debt,weight,na.rm = TRUE))]
+
+# Working Directory 설정 및 소득/자산 변수 설정
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\여성 가구주 - 중간값\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+# 사업소득비율 시각화
+
+lapply(list_,function(x) {
+  plt <- x %>% ggplot(aes(x = hhage, y = bus_prop)) +
+    geom_line(size = 1)+
+    labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 여성" ),
+         x = "가구주 나이" ,
+         y = "%" ) +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme_stata(scheme = "s1mono") +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  
+  png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 경상소득대비 사업소득 비율 - 여성.png" ) , width = 720)
+  print(plt)
+  dev.off()
+})
+
+# 각 종사상지위X소득/자산 변수별 시각화
+
+options(scipen = 999)
+foreach(eng = varlist, kor = varnames) %do% {
+  lapply(list_,function(x) {
+    plt <- x %>% ggplot(aes_string(x = "hhage", y = paste0("round(",eng,",2)"))) +
+      geom_line(size = 1) +
+      labs(title = paste0(unique(x$hhrank_), " 가구주 연령별 ", kor, " - 여성"),
+           y = paste0(kor, " (만 원)"),
+           x = "가구주 나이") +
+      scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+      theme_stata(scheme = "s1mono") +
+      theme(axis.title.y = element_text(size = 14) ,
+            axis.title.x = element_text(size = 14) ,
+            axis.title = element_text(size = 22)) 
+    
+    png(paste0( graph_wd, unique(x$hhrank_), " 가구주 연령별 ", kor, " - 여성.png"), width = 720)
+    print(plt)
+    dev.off()
+  })
+}
+
+file_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과\\"
+
+# 엑셀저장
+names(list_[[5]]) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+write.xlsx(list_[[5]],paste0(file_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"), sheet = "사업소득 있는 가구 - 여성",
+           append = TRUE)
+
+lapply(list_[1:4], function(x) {
+  names(x) <- c("가구주 만나이","가구구분","경상소득","사업소득","근로소득","재산소득","사업소득비율(%)","순자산","자산","부채")
+  write.xlsx(x,paste0(file_wd, "각 그룹의 연령별 결과 - 중간값.xlsx"),sheet = paste0(unique(x$가구구분), " - 여성"), 
+             append=TRUE)
+})
+
+
+```
+
+
+###############################################################################################################################################################################
+
+# 성별X학력X배우자
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  mainp[hhsex==1 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  mainp[hhsex==2 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  mains[hhsex==1 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  mains[hhsex==2 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  maino[hhsex==1 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 남성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r message=FALSE}
+levels_ <- unique(mainp$hhedu)
+married_ <- 1:4
+list_ <- foreach(i = levels_) %:%
+  foreach(j=married_) %do% {
+  maino[hhsex==2 & hhedu==i & married == j] %>% 
+    .[,keyby = c("hhage","married","hhedu","hhsex"),
+      .(dis_inc = round(weighted.mean(dis_inc,weight,na.rm = TRUE),2),
+      bus_inc = round(weighted.mean(bus_inc,weight,na.rm = TRUE),2),
+      labor_inc = round(weighted.mean(labor_inc,weight,na.rm = TRUE),2),
+      net_asset = round(weighted.mean(net_asset,weight,na.rm = TRUE),2),
+      asset = round(weighted.mean(asset,weight,na.rm = TRUE),2),
+      debt = round(weighted.mean(debt,weight,na.rm = TRUE),2))]
+  }
+list_ <- unlist(list_,recursive = FALSE)
+
+graph_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\결과_성별X학력X배우자\\"
+varlist <- c("dis_inc","bus_inc","labor_inc","cap_inc","net_asset","asset","debt")
+varnames <- c("경상소득","사업소득","근로소득","재산소득","순자산","자산","부채")
+
+lapply(list_,function(x) {
+  plt <- x %>% .[hhage>29] %>% ggplot(aes(x = hhage, y = dis_inc)) +
+    geom_line(size = 1) +
+    labs(title = paste0(x$hhedu, "인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married)),
+         x = "가구주 나이",
+         y = "만 원") +
+    theme_stata(scheme = "s1mono") +
+    scale_x_continuous(breaks = seq( 20, 100 , 10 )) +
+    theme(axis.title.y = element_text(size = 14) ,
+          axis.title.x = element_text(size = 14) ,
+          axis.title = element_text(size = 22)) 
+  png(paste0(graph_wd,unique(x$hhedu),"인 여성 가구주 연령별 가구경상소득(중간값)","_",as_factor(x$married),".png"),
+      width = 720)
+  print(plt)
+  dev.off()
+})
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+x <- runif(10,1,10)
+w <- runif(10,200,1000)
+x;w
+```
+```{r}
+weighted.median(x,w);weighted.mean(x,w)
+```
+

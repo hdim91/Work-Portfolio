@@ -1,0 +1,372 @@
+---
+title: "Untitled"
+author: "Hyundo Im"
+date: '2022 4 25 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r message=FALSE,warning=FALSE}
+library(plyr)
+library(tidyverse)
+library(readxl)
+require(jsonlite) # fromJSON() 을 사용하기 위한 패키지
+require(httr) # GET() 통하여 받은 데이터의 text화
+require(glue)
+require(stringr)
+require(labelled)
+```
+
+```{r pressure, echo=FALSE}
+rm(list=ls())
+```
+```{r message=FALSE,warning=FALSE}
+corpcode <- read_excel("corpcode.xlsx")
+company <- read_excel("emission_company.xlsx")
+corpcode %>% filter(grepl("대덕전자",corp_name))
+```
+```{r}
+names(company)[1] <- "corp_name"
+```
+```{r}
+corpcode <- corpcode %>% 
+  group_by(corp_name) %>% 
+  mutate(recent = max(as.numeric(modify_date),na.rm = TRUE))
+recent_comps <- corpcode %>% 
+  filter(as.numeric(modify_date)==recent) %>% 
+  select(corp_code,corp_name,recent)
+length(unique(recent_comps$corp_name))
+```
+```{r}
+# company;df
+# company_ <- company
+# names(company_) <- c("upche_opt","sector","enter_year","standard","address")
+# company_ <- company_ %>% mutate(addr1_kor = gsub("서울특별시","서울",
+#                                                  gsub("부산광역시","부산",
+#                                                       gsub("울산광역시","울산",
+#                                                            gsub("대구광역시","대구",
+#                                                                 gsub("광주광역시","광주",
+#                                                                      gsub("세종특별자치시","세종",
+#                                                                           gsub("대전광역시","대전",
+#                                                                                gsub("인천광역시","인천",
+#                                                                                     gsub("경기도","경기",
+#                                                                                          gsub("강원도","강원",
+#                                                                                               gsub("충청북도","충북",
+#                                                                                                    gsub("충청남도","충남",
+#                                                                                                         gsub(""))))))))))))))
+# company_ %>% left_join(df,by="upche_opt")
+```
+```{r}
+df %>% filter(upche_opt=="엠에스씨")
+```
+
+```{r}
+df <- company %>% 
+  left_join(recent_comps %>% select(corp_code,corp_name))
+```
+```{r}
+df %>% filter(corp_name=="대덕전자")
+```
+
+```{r}
+xlsx::write.xlsx(df %>% filter(!is.na(corp_code)),"emission_code.xlsx")
+```
+```{r}
+
+```
+```{r}
+# comp_e <- read_excel("archive\\emp\\할당대상업체 종업원 수.xlsx")
+```
+```{r message = FALSE, warning=FALSE}
+comp_e <- comp_e %>% mutate(emp_sum = gsub(",","",emp_sum))
+list_1 <- comp_e %>% group_by(corp_name,corp_code,year,quarter) %>% 
+  summarise(emp_sum = sum(as.numeric(emp_sum,na.rm=TRUE)))
+```
+```{r}
+graph <- comp_e %>% group_by(year,quarter) %>% 
+  summarise(emp_sum = sum(as.numeric(emp_sum),na.rm = TRUE)/10000) %>% 
+  mutate(date = paste0(year,"-",quarter)) %>% 
+  mutate(date = as.yearqtr(date)) %>% 
+  ggplot(aes(x=date,y=emp_sum)) +
+  geom_line(lwd=1) 
+  scale_x_yearqtr(format = "%Y\nQ%q",n=10) +
+  ylim(95,110) +
+  ggthemes::theme_stata(scheme = "s1mono") +
+  labs(title = "배출권거래제 참여기업 총 종업원 수(만 명)",x="",y="")
+png("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\배출권거래제\\총 종업원 수(만 명).png",width = 840,height=560)
+print(graph)
+dev.off()
+# ?scale_x_yearqtr
+```
+```{r}
+
+```
+==================================================================================================================================================================
+==================================================================================================================================================================
+==================================================================================================================================================================
+==================================================================================================================================================================
+==================================================================================================================================================================
+```{r}
+# comp1 <- read_excel("할당대상업체_1차.xls")
+# comp2 <- read_excel("할당대상업체_2차.xls")
+# comp1 <- comp1 %>% mutate(first = 1)
+# comp1 <- comp1 %>% mutate(first_year = 지정연도)
+# 
+# comp_test <- comp2 %>% left_join(comp1 %>% select("first","업체명","first_year"))
+# names(comp_test) <- c("no.","second","year","ind","name","address","standard","doc","first","first_year")
+# comp_test <- comp_test %>%
+#   mutate(sido = word(address,1))
+# # unique(comp_test$sido)
+# comp_test$sido <- recode(comp_test$sido,
+#          "경남"="경상남도","전북"="전라북도","충북"="충청북도","서울"="서울특별시","서울시"="서울특별시","강원"="강원도","서을특별시"="서울특별시","대구"="대구광역시","경기"="경기도",
+#          "충남"="충청남도","울산"="울산광역시","인천"="인천광역시")
+# comp_test <- comp_test %>%
+#   mutate(sigungu = word(address,2))
+# comp_test <- comp_test %>%
+#   mutate(first = ifelse(is.na(first),0,first))
+# comp_test <- comp_test %>%
+#   mutate(name = gsub("[(]주[)]","",name)) %>%
+#   mutate(name = gsub("[(]유[)]","",name)) %>%
+#   mutate(name = gsub("주식회사","",name)) %>%
+#   mutate(name = gsub("유한회사","",name)) %>%
+#   mutate(name = gsub(" ","",name))
+# 
+# emission_code <- read_excel("rsc\\emission_code.xlsx")
+# names(emission_code) <- c("corp_name","ind2","year","standard","address","corp_code")
+# testing <- comp_test %>%
+#   left_join(emission_code,by=c("year","standard","address"))
+# testing <- testing %>% group_by(no.) %>% mutate(cnt = n())
+# 
+# testing %>% filter(cnt>1)
+# xlsx::write.xlsx(export,"editing.xlsx")
+```
+```{r}
+emission_code %>% filter(corp_name=="삼현")
+corpcode %>% filter(grepl("동일산업",corp_name))
+comp_info %>% filter(stock_name=="동일산업")
+```
+
+```{r}
+emission_code %>% filter(grepl("대덕",corp_name))
+```
+
+
+
+```{r}
+export <- read_excel("editing.xlsx")
+comp_info <- read_excel("archive\\comp_info\\emission_comp_info.xlsx")
+export <- export %>% 
+  left_join(comp_info %>% select(corp_code,induty_code,bizr_no,jurir_no))
+export <- export %>% select(-...1)
+export <- export %>% group_by(no.) %>% mutate(cnt = n())
+# export %>% filter(cnt>1)
+
+
+export <- export %>% 
+  mutate(ind = as.numeric(induty_code))
+export <- export %>% 
+  mutate(ind = ifelse(ind>9999,ind%/%1000,
+                      ifelse(ind>999,ind%/%100,
+                             ifelse(ind>99,ind%/%10,ind))))
+
+ind_code <- read_excel("rsc\\ind_code.xlsx")
+ind_code$values <- as.numeric(ind_code$values)
+Ind_code <- read_excel("rsc\\ind_code.xlsx",sheet = "upper")
+
+export <- export %>% 
+  mutate(ind = factor(ind,
+                      levels = ind_code$values,
+                      labels = ind_code$labels))
+unique(export$ind)
+export$ind <- labelled::to_labelled(export$ind)
+export <- export %>% 
+  mutate(Ind = ifelse(ind<5,1,
+                      ifelse(ind<10,2,
+                             ifelse(ind<35,3,
+                                    ifelse(ind<36,4,
+                                           ifelse(ind<41,5,
+                                                  ifelse(ind<45,6,
+                                                         ifelse(ind<49,7,
+                                                                ifelse(ind<55,8,
+                                                                       ifelse(ind<58,9,
+                                                                              ifelse(ind<64,10,
+                                                                                     ifelse(ind<68,11,
+                                                                                            ifelse(ind<70,12,
+                                                                                                   ifelse(ind<74,13,
+                                                                                                          ifelse(ind<84,14,
+                                                                                                                 ifelse(ind<85,15,
+                                                                                                                        ifelse(ind<86,16,
+                                                                                                                               ifelse(ind<90,17,
+                                                                                                                                      ifelse(ind<94,18,
+                                                                                                                                             ifelse(ind<97,19,
+                                                                                                                                                    ifelse(ind<99,20,
+                                                                                                                                                           ifelse(ind<100,21,NA))))))))))))))))))))))
+# unique(export$Ind)
+export$Ind <- factor(export$Ind,
+                     levels = Ind_code$values,
+                     labels = Ind_code$labels)
+export$Ind <- gsub("[(][0-9]{2}~[0-9]{2}[)]","",export$Ind)
+
+comp_test %>% filter(no.%in%c("558","557"))
+export %>% filter(name=="한국제지")
+```
+
+```{r}
+# dropped <- export %>% filter(is.na(ind))
+```
+```{r}
+# dropped %>% select(-corp_code) %>% mutate(corp_name=name) %>% left_join(recent_comps %>% select(corp_name,corp_code),by="corp_name")
+# 
+# recent_comps %>% filter(grepl("대덕전자",corp_name))
+# 
+# corpcode %>% filter(grepl("롯데",corp_name))
+# 
+# comp_info %>% filter(grepl("롯데푸드",corp_name))
+```
+
+
+```{r}
+
+```
+```{r}
+
+map_code <- read_excel("rsc\\map_code.xlsx")
+names(map_code)[5] <- "sigungu"
+map_code[map_code$sigungu=="청원구",]$sigungu <- "청주시"
+export <- export %>%
+  mutate(sigungu = ifelse(grepl("동안구",address),"동안구",
+                      ifelse(grepl("청원군",address),"청원구",
+                        ifelse(grepl("만안구",address),"만안구",
+                          ifelse(grepl("세종특별자치시",address),"세종특별자치시",sigungu)))))
+unique(export$sido)
+# export %>% left_join(map_code) %>% filter(is.na(SIGUNGU_CD))
+```
+```{r}
+export <- export %>% 
+  mutate(sido_cd = ifelse(sido=="서울특별시",11,
+                    ifelse(sido=="부산광역시",21,
+                      ifelse(sido=="대구광역시",22,
+                        ifelse(sido=="인천광역시",23,
+                          ifelse(sido=="광주광역시",24,
+                                 ifelse(sido=="대전광역시",25,
+                            ifelse(sido=="울산광역시",26,
+                              ifelse(sido=="세종특별자치시",29,
+                      ifelse(sido=="경기도",31,
+                        ifelse(sido=="강원도",32,
+                          ifelse(sido=="충청북도",33,
+                            ifelse(sido=="충청남도",34,
+                              ifelse(sido=="전라북도",35,
+                                ifelse(sido=="전라남도",36,
+                                  ifelse(sido=="경상북도",37,
+                                    ifelse(sido=="경상남도",38,
+                                      ifelse(sido=="제주특별자치도",39,NA))))))))))))))))))
+map_code <- map_code %>% mutate(sido_cd = as.numeric(SIGUNGU_CD)%/%1000)
+export <- export %>% mutate(sigungu = ifelse(grepl("인천광역시 남구",address),"미추홀구",sigungu))
+export2 <- export %>% left_join(map_code)
+export2 <- export2 %>% mutate(sigun_check = word(address,3))
+export2 <- export2 %>% group_by(no.) %>% mutate(cnt = n())
+export2 <- export2 %>% mutate(filt_ = ifelse(cnt==1,1,
+                                ifelse(SIGUNGU_NM==sigun_check,1,0)))
+export2 <- export2 %>% filter(filt_==1)
+# tmp %>% filter(filt_==1)
+export2 %>% filter(is.na(SIGUNGU_CD))
+
+export %>% filter(no.=="561")
+export2 %>% filter(no.=="561")
+```
+```{r}
+# tmp <- as.numeric(export2$SIGUNGU_CD)%/%1000
+# unique(tmp)
+# export2 <- export2  %>% select(-c(...1,no.)) %>% as.data.frame()
+export2 <- as.data.frame(export2)
+export2 <- export2 %>% select((-no.))
+# export2 <- export2 %>% select(-no.)
+export2 <- export2 %>% select(-c(sigun_check,cnt,filt_))
+names(export2)[18] <- "sigungu_cd"
+var_label(export2) <- c("2차 여부", "년도", "산업중분류","기업명","주소","분류기준, 업체는 기업 전체, 사업체는 주소의 사업체만",
+                        "근거서류","1차 참여여부", "1차 참여년도","시도","시군구","DART기업명","할당업체 참여분류","기업코드","산업코드 - 중분류~세세별",
+                        "산업대분류","시도코드","시군구코드",
+                        "모든 대문자 변수는 지도작성시 사용","모든 대문자 변수는 지도작성시 사용","모든 대문자 변수는 지도작성시 사용","모든 대문자 변수는 지도작성시 사용")
+```
+```{r}
+xlsx::write.xlsx(export2,
+                 "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\배출권거래제\\배출권거래 기업 데이터\\배출권거래 할당업체 산업 및 지역.xlsx")
+haven::write_dta(export2,
+                 "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\배출권거래제\\배출권거래 기업 데이터\\배출권거래 할당업체 산업 및 지역.dta")
+```
+```{r}
+rm(list=ls())
+```
+```{r}
+export2
+```
+```{r}
+export
+```
+```{r}
+comp_test %>% filter(no.=="561")
+```
+```{r}
+export %>% filter(no.=="562")
+```
+```{r}
+export %>% filter(is.na(induty_code))
+```
+```{r}
+Ind_list <- export2 %>%
+  filter(!(name %in% c("부흥석회","삼흥열처리","에쓰큐씨"))) %>%
+  group_by(Ind,first) %>%
+  count() %>%
+  mutate(Ind = ifelse(is.na(Ind),"공공기관 및 교육기관",Ind)) %>%
+  mutate(first = factor(first,
+                        levels = 0:1,
+                        labels = c("신규진입","연장")))
+Ind_reg_list <- export %>%
+  group_by(sido,Ind,first) %>%
+  count() %>%
+  mutate(Ind = ifelse(is.na(Ind),"공공기관 및 교육기관",Ind))
+
+graph <- Ind_list %>%
+  ggplot(aes(x=Ind,y=n,fill=first)) +
+  geom_bar(stat = "identity",position = "dodge") +
+  coord_flip() +
+  ggthemes::theme_stata(scheme = "s1mono") +
+  labs(caption = "*'공공기관 및 교육기관'은 대학교,공사,공단,병원,시/도청 등\n**Dart DB에 존재하지 않는 3개의 소규모 업체들은 제외") +
+  theme(axis.text.y = element_text(angle = 0),
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        legend.title = element_blank(),plot.caption = element_text(size=12)
+        )
+png("C:\\Users\\master\\Dropbox\\한요셉 박사님\\2022년 과제\\배출권거래제\\그림\\산업대분류별.png",
+    width=1040,height=540)
+print(graph)
+dev.off()
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+```{r}
+
+```
+v
+

@@ -1,0 +1,168 @@
+---
+title: "Untitled"
+output: html_document
+date: '2022-06-22'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library(plyr)
+library(tidyverse)
+library(readxl)
+require(jsonlite) # fromJSON() 을 사용하기 위한 패키지
+library(haven)
+require(httr) # GET() 통하여 받은 데이터의 text화
+require(glue)
+require(stringr)
+require(labelled)
+```
+
+```{r}
+setwd("C:\\Users\\master\\Dropbox\\My Asset\\기업분석\\dta4")
+list_files <- list.files(pattern=".dta")
+df <- haven::read_dta("fs_data20.dta")
+for(i in 6:10){
+  tmp <- haven::read_dta(list_files[i])
+  df <- rbind(df,tmp)
+}
+```
+```{r}
+# for(i in 1:3){
+#   setwd(paste0("C:\\Users\\master\\Dropbox\\My Asset\\기업분석\\dta",i))
+#   list_files <- list.files(pattern=".dta")
+#   assign(paste0("rest_df",i), haven::read_dta(list_files[11]))
+#   for(j in 8:10){
+#     tmp <- haven::read_dta(list_files[j])
+#     assign(paste0("rest_df",i), rbind(get(paste0("rest_df",i)),tmp))
+#   }
+# }
+# 
+# rest_df <- rbind(rest_df1 %>% mutate(quarter=1),rest_df2 %>% mutate(quarter=2))
+# rest_df <- rbind(rest_df,rest_df3 %>% mutate(quarter=3))
+
+```
+```{r pressure, echo=FALSE}
+export <- read_excel("editing.xlsx")
+comp_info <- read_excel("archive\\comp_info\\emission_comp_info.xlsx")
+export <- export %>%
+  left_join(comp_info %>% select(corp_code,induty_code,bizr_no,jurir_no))
+names(export)[18] <- "business_no"
+export <- export[,-c(1:2)]
+names(export)[2] <- "enter_year"
+```
+```{r}
+# options(scipen = 999)
+# export
+# write.csv(export,"emission_export.csv",fileEncoding ="euc-kr")
+
+```
+
+```{r}
+merged <- export %>% left_join(df,by="business_no") %>% mutate(quarter=4)
+# merged_add <- export %>% left_join(rest_df,by="business_no")
+```
+
+```{r}
+var_label(merged)[1:17] <- c("2차여부","2차편입년도","업종","회사명-할당업체","주소","단위","근거문서","1차여부","1차 편입년도",
+                             "시도",
+                             "시군구",
+                             "기업명",
+                             "업종_2차",
+                             "회사코드(DART)",
+                             "산업코드(DART)",
+                             "사업자등록번호",
+                             "법인등록번호")
+merged <- merged %>% mutate(inwon_nice = inwon,
+                             inwon_nice_yyyymm = inwon_yyyymm) %>% 
+  select(-c(inwon,inwon_yyyymm)) %>% left_join(emp.export,by=c("year","upchecd"))
+
+```
+```{r}
+write_dta(merged %>% mutate(inwon_yyyymm = inwon_yyyymm%/%100),
+          "archive\\comprehensive\\할당대상업체 매출 및 고용.dta")
+
+```
+
+
+```{r}
+setwd("rsc\\emission_amount")
+list_files <- list.files(pattern = "xls")
+assign("emi_df",read_excel(list_files[length(list_files)]))
+names(emi_df) <- c("no","name","year","standard","ind","dummy","co2","energy_cons","appraise")
+for(i in 1:(length(list_files)-1)){
+  tmp <- read_excel(list_files[i])
+  names(tmp) <- c("no","name","year","standard","ind","dummy","co2","energy_cons","appraise")
+  emi_df <- rbind(emi_df,tmp)
+}
+emi_df <- emi_df %>% select(-c(no,standard,ind,dummy,appraise))
+emi_df <- emi_df %>% 
+  mutate(name = gsub("[(]주[)]","",name))
+emi_df_ <- emi_df %>% 
+  mutate(name = gsub("주식회사 ","",
+                     gsub(" 주식회사","",
+                          gsub("국립대학법인 ","",
+                               gsub("사회복지법인 ","",
+                                    gsub("재단법인 ","",
+                                         gsub("학교법인 ","",
+                                              gsub("[(]유[)]","",
+                                                   gsub(" 전주공장","",
+                                                        gsub("유한책임회사","",
+                                                             gsub("주식회사","",name)))))))))))
+emi_df_ <- emi_df_ %>% mutate(year = as.numeric(year))
+emi_df_ <- emi_df_ %>% mutate(name = gsub(" METALLOY","",
+                          gsub(" METAL","",
+                          gsub(" 시흥공장","",
+                          gsub(" 군산지점","",
+                          gsub(" 춘추광업소","",
+                          gsub(" 문경공장","",
+                          gsub(" 음성공장","",
+                          gsub(" 김제공장","",
+                          # gsub("오뚜기라면","오뚜기",
+                          gsub(" 대풍공장","",
+                          gsub(" ","",name)))))))))))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("유한회사","",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("유한책임회사","",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("오리온엔지니어드카본즈코리아","오리온엔지니어드카본즈",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("삼양식품원주공장","삼양식품",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("현곡공장","",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("㈜","",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("울산공장","",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("삼기오토모티브평택공장","삼기",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("삼기오토모티브서산공장","삼기",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("삼기오토모티브","삼기",name))
+emi_df_ <- emi_df_ %>% mutate(name = gsub("한국알스트롬","한국알스트롬뭉쇼",name))
+
+merged <- merged %>% mutate(name=gsub("학교법인","",name))
+merged <- merged %>% mutate(name = gsub("유한책임회사","",name))
+# emi_df;tmp
+merged <- merged %>% mutate(name = gsub("재단법인","",name))
+# merged_co2 <- merged %>% left_join(emi_df_,by=c("year","name")) %>% filter(is.na(co2)) %>% select(name,year,co2,standard) %>% distinct(name,standard)
+merged_co2 <- merged %>% left_join(emi_df_,by=c("year","name"))
+```
+```{r}
+merged_co2 <- merged_co2 %>% mutate(co2 = as.numeric(co2),
+                                    energy_cons = as.numeric(energy_cons))
+var_label(merged_co2)[c(55,56)] <- c("온실가스 배출량(tCO2-eq)",
+                                     "에너지 사용량(TJ)")
+write_dta(merged_co2 %>% mutate(inwon_yyyymm = inwon_yyyymm%/%100),
+          "archive\\comprehensive\\할당대상업체 매출 및 고용_배출량 추가.dta")
+
+```
+
+```{r}
+merged %>% select(upchecd)
+```
+
+
+```{r}
+comp_info %>% left_join(emi_df %>% mutate(corp_name=name),by="corp_name")
+```
+
+```{r}
+emi_df %>% filter(grepl("페록사이드",name))
+```
+

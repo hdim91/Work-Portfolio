@@ -1,0 +1,242 @@
+---
+title: "Household Finance Welfare Survey"
+author: "Hyundo Im"
+date: '2020 7 1 '
+output: html_document
+---
+
+```{r}
+library(plyr)
+library(tidyverse)
+library(readxl)
+library(readr)
+library(haven)
+library(xlsx)
+library(psych)
+library(zoo)
+library(Hmisc)
+library(stringr)
+rm(list=ls())
+```
+
+
+```{r}
+data_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2020년 과제\\가계금융복지조사\\데이터\\"
+dta_wd <- "C:\\Users\\master\\Dropbox\\한요셉 박사님\\2020년 과제\\가계금융복지조사\\데이터\\"
+```
+
+```{r}
+setwd(data_wd)
+hhlist <- list.files(pattern = "가구.csv")
+memberlist <- list.files(pattern = "가구원.csv")
+hhnames <- c()
+hmnames <- c()
+for(i in 1:length(hhlist)){
+  assign(paste0("hh",str_extract_all(hhlist,"[0-9]+")[[1]][i]),
+         as.data.table(readr::read_csv(hhlist[i],locale=locale('ko',encoding='euc-kr'))))
+  hhnames <- c(hhnames,paste0("hh",str_extract_all(hhlist,"[0-9]+")[[1]][i]))
+}
+
+for(i in 1:length(memberlist)){
+  assign(paste0("hm",str_extract_all(memberlist,"[0-9]+")[[1]][i]),
+         as.data.table(readr::read_csv(memberlist[i],locale=locale('ko',encoding='euc-kr'))))
+  hmnames <- c(hmnames, paste0("hm",str_extract_all(memberlist,"[0-9]+")[[1]][i]))
+}
+```
+
+```{r}
+
+for(i in 1:length(hhnames)){
+  rslt <- get(hhnames[i])
+  nlist <- names(rslt)
+  nlist <- gsub(" ","", nlist)
+  nlist <- gsub("[(]","_",nlist)
+  nlist <- gsub("[)]","",nlist)
+  nlist <- gsub("[[]","",nlist)
+  nlist <- gsub("[]]","",nlist)
+  nlist <- gsub("^1","일",nlist)
+  nlist <- gsub("~","", nlist)
+  nlist <- gsub("공적이전소득_보완+사적이전소득_조사","",nlist)
+  nlist <- gsub("경상소득_보완-비소비지출_보완","",nlist)
+  names(rslt) <- nlist
+  assign(hhnames[i], rslt)
+}
+
+for(i in 1:length(hmnames)){
+  rslt <- get(hmnames[i])
+  nlist <- names(rslt)
+  nlist <- gsub(" ","", nlist)
+  nlist <- gsub("[(]","_",nlist)
+  nlist <- gsub("[)]","",nlist)
+  nlist <- gsub("[[]","",nlist)
+  nlist <- gsub("[]]","",nlist)
+  nlist <- gsub("가구원정보","가구원_",nlist)
+  nlist <- gsub("~","", nlist)
+  names(rslt) <- nlist
+  assign(hmnames[i], rslt)
+}
+
+names(hh2019);names(hm2019)
+```
+
+
+```{r}
+fin19 <- as.data.table(hh2019)
+list_ <- names(fin19)[c(1:6,12:18,20,22,23,32,48,102:108)]
+main <- fin19[,..list_]
+names(main) <- c("year","hid","weight","capital","hhsex","cnt","hhedu","hhgrad","hhedu_tot","together","hhind","hhjob","hhage","hhrank","married","live_type",
+                 "asset","debt","net_asset","dis_inc","labor_inc","bus_inc","cap_inc","trans_inc_public","trans_inc_prv")
+write_dta(main,paste0(dta_wd,"2019년 가계금융복지조사.dta"))
+```
+
+```{r}
+list_ <- main %>% .[cnt==1 & hhsex==1] %>% 
+  .[hhrank==3 & hhind == "M" & hhjob == 2] %>% 
+  .[,keyby = "hhage", .(bus_inc = weighted.mean(bus_inc, weight, na.rm = TRUE))]
+list_ %>% ggplot(aes(x=hhage,y=bus_inc)) +
+  geom_line(size=1) +
+  labs( x = "가구주 만나이",
+        y = "만 원" ,
+        title = "1인가구의 가구주 만나이별 평균 연사업소득",
+        caption = "자료: 가계금융복지조사, 2019년") +
+  theme_stata(scheme = "s1mono") +
+  scale_x_continuous(breaks = seq(20,100,10))
+
+list_ <- main %>% .[cnt==1] %>% 
+  .[hhrank==1] %>% 
+  .[,keyby = "hhage", .(labor_inc = weighted.mean(labor_inc, weight, na.rm = TRUE))]
+list_ %>% ggplot(aes(x=hhage,y=labor_inc)) +
+  geom_line(size=1) +
+  ylim(0,7000) +
+  labs( x = "가구주 만나이",
+        y = "만 원" ,
+        title = "1인가구의 상용근로자 가구주 만나이별 평균 연노동소득",
+        caption = "자료: 가계금융복지조사, 2019년") +
+  theme_stata(scheme = "s1mono") +
+  scale_x_continuous(breaks = seq(20,100,10))
+
+main[hhrank==3&hhind=="M"&hhjob==2&dis_inc>45000]
+```
+
+```{r}
+list_ <- main %>% .[hhrank==3|hhrank==4] %>% 
+  .[,keyby = c("hhage","cnt"),
+    .(bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE))]
+list_ %>% .[cnt<5] %>% ggplot(aes(x = hhage, y = bus_inc, group = factor(cnt))) +
+  geom_line(aes(lty = factor(cnt), color = factor(cnt)), size = 1) +
+  labs( x = "가구주 만나이",
+        y = "사업소득" ,
+        lty = "가구원 수",
+        color = "가구원 수",
+        title = "가구원 수 X 가구주 만나이별 사업소득") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{r}
+list_ <- main %>% .[hhrank==3|hhrank==4] %>% 
+  .[,cntgroup := ifelse(cnt>1,"2인 이상","1인가구")] %>% 
+  .[,keyby = c("hhage","cntgroup","hid"),
+    .(bus_inc = mean(bus_inc,na.rm=TRUE),
+      dis_inc = mean(dis_inc,na.rm = TRUE),
+      labor_inc = mean(labor_inc,na.rm=TRUE),
+      weight = mean(weight,na.rm=TRUE))] %>% 
+  .[,bus_prop := bus_inc/dis_inc * 100] %>% 
+  .[,keyby = c("hhage","cntgroup"),
+    .(bus_prop = weighted.mean(bus_prop,weight,na.rm = TRUE))]
+graph1 <- list_ %>% ggplot(aes(x = hhage, y = bus_prop, color = cntgroup, group = cntgroup)) +
+  geom_line(size = 1) +
+  ylim(0,100) +
+  labs( x = "가구주 만나이",
+        y = "%" , 
+        color = "가구원 수",
+        title = "가구원 수 X 가구주 만나이별 사업소득 비율") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{r}
+list_ <- main %>% .[hhrank==3|hhrank==4] %>% 
+  .[,cntgroup := ifelse(cnt>1,"2인 이상","1인가구")] %>% 
+  .[,keyby = c("hhage","cntgroup","hid"),
+    .(bus_inc = mean(bus_inc,na.rm=TRUE),
+      dis_inc = mean(dis_inc,na.rm = TRUE),
+      labor_inc = mean(labor_inc,na.rm=TRUE),
+      weight = mean(weight,na.rm=TRUE))] %>% 
+  .[,labor_prop := labor_inc/dis_inc * 100] %>% 
+  .[,keyby = c("hhage","cntgroup"),
+    .(labor_prop = weighted.mean(labor_prop,weight,na.rm = TRUE))]
+graph2 <- list_ %>% ggplot(aes(x = hhage, y = labor_prop, color = cntgroup, group = cntgroup)) +
+  geom_line(size = 1) +
+  labs( x = "가구주 만나이",
+        y = "%" , 
+        color = "가구원 수",
+        title = "가구원 수 X 가구주 만나이별 근로소득 비율") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{r warning=FALSE, message=FALSE}
+p1 <- cowplot::plot_grid(graph1,graph2)
+p2 <- cowplot::plot_grid(p1,graph3,ncol=1)
+
+png("C:\\Users\\master\\Dropbox\\개인 관심사\\2019년 소득 비율.png",height = 720, width = 720)
+print(p2)
+dev.off()
+```
+
+```{r}
+list_ <- main %>% .[hhrank==3|hhrank==4] %>% 
+  .[,cntgroup := ifelse(cnt>1,"2인 이상","1인가구")] %>% 
+  .[,keyby = c("hhage","cntgroup","hid"),
+    .(bus_inc = mean(bus_inc,na.rm=TRUE),
+      dis_inc = mean(dis_inc,na.rm = TRUE),
+      labor_inc = mean(labor_inc,na.rm=TRUE),
+      cap_inc = mean(cap_inc,na.rm=TRUE),
+      weight = mean(weight,na.rm=TRUE))] %>% 
+  .[,cap_prop := cap_inc/dis_inc * 100] %>% 
+  .[,keyby = c("hhage","cntgroup"),
+    .(cap_prop = weighted.mean(cap_prop,weight,na.rm = TRUE))]
+graph3 <- list_ %>% ggplot(aes(x = hhage, y = cap_prop, color = cntgroup, group = cntgroup)) +
+  geom_line(size = 1) +
+  ylim(0,100) +
+  labs( x = "가구주 만나이",
+        y = "%" , 
+        color = "가구원 수",
+        title = "가구원 수 X 가구주 만나이별 재산소득 비율") +
+  theme_stata(scheme = "s1mono")
+```
+
+```{r}
+list_ <- main[dis_inc>0&hhrank==1][,keyby = c("hhedu"),
+              .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE))]
+list_
+```
+
+```{r}
+main[dis_inc>0&hhrank==1][,keyby = c("hhedu"),
+              .(dis_inc = max(dis_inc))]
+```
+
+```{r}
+length(unique(main$hid[main$hhedu==8]))
+```
+
+```{r}
+options(scipen = 999)
+list_ <- main %>% 
+  .[,keyby = c("hhsex","hhage","hhedu"),
+    .(dis_inc = weighted.mean(dis_inc,weight,na.rm = TRUE),
+      bus_inc = weighted.mean(bus_inc,weight,na.rm = TRUE),
+      labor_inc = weighted.mean(labor_inc,weight,na.rm = TRUE),
+      net_asset = weighted.mean(net_asset,weight,na.rm = TRUE),
+      asset = weighted.mean(asset,weight,na.rm = TRUE),
+      debt = weighted.mean(debt,weight,na.rm = TRUE))]
+names(list_) <- c("가구주 성별", "가구주 나이", "가구주 교육수준","경상소득","사업소득","근로소득","순자산","자산","부채")
+
+```
+
+```{r}
+mainhh <- main[,keyby = "hid",
+               ]
+```
+
+
+
