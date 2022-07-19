@@ -1,0 +1,153 @@
+library(plyr) ## 칼럼 dimension이 일치하지 않는 데이터들을 합치기 위한 패키지
+library(tidyverse) ## 데이터 클리닝 용
+library(dplyr)
+library(readxl) ## 엑셀파일을 읽기위한 패키지
+library(readr) ## txt 데이터 파일들을 읽기위한 패키지
+library(haven) ## 두 명령어: read_dta() #dta 파일 import,  as_factor() Stata의 factor를 사용
+library(xlsx) ## 엑셀파일을 생성하기 위한 패키지
+library(psych) 
+library(zoo) ## 시계열 scale 사용
+library(ggthemes) ## STATA 그래프 형식 사용
+library(data.table)
+library(ggplot2)
+rm(list=ls())
+
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\지역별고용조사\\raw")
+temp <- list.files(pattern = ".txt")
+temp_xls <- list.files(pattern = ".xls")
+# temp;temp_xls
+split_nm <- c()
+years <- 2013:2020
+half <- 1:2
+try(for(j in 1:length(years)){
+  for(i in 1:length(half)){
+    rslt <- read_excel(paste0("지역_",half[i],".xls"),sheet=paste0("지역_",years[j],"_",half[i]))
+    rslt[,"year"] <- years[j]
+    rslt[,"half"] <- half[i]
+    split_nm <- paste0("split",years[j],"_",half[i])
+    assign(split_nm,rslt)
+  }
+})
+split_list <- lapply(ls(pattern = "split[0-9]"),function(x) get(x)) 
+for(i in 1:length(split_list)){
+  split_list[[i]] <- split_list[[i]][c("항목명","시작위치","길이","year","half")]
+}
+change_type <- function(DF){
+  DF[,"길이"] <- as.numeric(unlist(DF[,"길이"]))
+  DF
+}
+split_list <- lapply(split_list, change_type)
+split_df <- split_list[[1]]
+for(i in 2:length(split_list)){
+  split_df <- rbind(split_df,split_list[[i]])
+}
+rm(list=ls(pattern = "split[0-9]"))
+
+
+setwd("C:\\Users\\master\\Dropbox\\한요셉 박사님 - 백업 및 전체 데이터\\2019년 과제\\지역별고용조사\\raw")
+try(for(i in unique(split_df$year)){
+  for(j in unique(split_df$half)){
+    dfnames <- paste0("local",i,"_",j)
+    assign(dfnames,
+           read_fwf(paste0("지역_",i,"_",j,".txt"),
+                    col_positions = fwf_widths(unlist(split_df[split_df$year==i&split_df$half==j,c("길이")]))))
+  }
+})
+local_list <- lapply(ls(pattern = "local[0-9]"),function(x) get(x))
+
+replace_ <- function(x){
+  x <- gsub("[0-9]{2}[-][0-9]{1}[-][0-9]{1}_","",x)
+  x <- gsub("[0-9]{2}[-][0-9]{1}[-][0-9]{1}[.]","",x)
+  x <- gsub("[0-9]{2}[-][0-9]{2}[.]","",x)
+  x <- gsub("[0-9]{2}[-][0-9]{1}[.]","",x)
+  x <- gsub("[0-9]{1}[-][0-9]{2}[.]","",x)
+  x <- gsub("[0-9]{1}[-][0-9]{1}[.]","",x)
+  x <- gsub("[0-9]{2}_[0-9][.]","",x)
+  x <- gsub("[0-9]{2}[.][0-9][.][0-9][.]","",x)
+  x <- gsub("[0-9]{1}[.][0-9][.][0-9][.]","",x)
+  x <- gsub("[0-9]{2}[.]","",x)
+  x <- gsub("[0-9]{1}[.]","",x)
+  x <- gsub("[(]고","고",x)
+  x <- gsub("[)]","",x)
+  x <- gsub("[(]","_",x)
+  x <- gsub(" ","",x)
+  x <- gsub(",","",x)
+  x <- gsub("경제활동구분","경제활동상태",x)
+  x <- gsub("경제활동상태구분","경제활동상태",x)
+  x <- gsub("3개월평균임금","월평균임금",x)
+  x <- gsub("최근3개월간평균임금","월평균임금",x)
+  x <- gsub("고용계약기간","근로기간",x)
+  x <- gsub("고용계약정한경우근로기간","근로기간",x)
+  x <- gsub("근로기간정함여부","근로기간계약여부",x)
+  x <- gsub("종사상의지위","종사상지위",x)
+  x <- gsub("주된일시간",
+            "주업시간",
+            x)
+  x <- gsub("다른일시간","부업시간",x)
+  x <- gsub("대상기간부업여부","부업여부",x)
+  x <- gsub("고용계약여부","근로기간계약여부",x)
+  x <- gsub("근로기간여부","근로기간계약여부",x)
+  x <- gsub("직장_일지위","종사상지위",x)
+  x <- gsub("행정구역_시군","행정구역",x)
+  x <- gsub("^4주내구직활동여부","구직활동여부4주내",x)
+  x <- gsub("^4주간구직활동여부","구직활동여부4주내",x)
+  x <- gsub("^3_총일한시간구분","총일한시간구분", x)
+  x <- gsub("^직장을그만둔이유","전직장이직이유",x)
+  x <- gsub("^이직사유","전직장이직이유", x)
+  x <- gsub("^비구직사유","구직활동하지않은이유", x)
+  x <- gsub("^직장구하지않은이유","구직활동하지않은이유", x)
+  x <- gsub("^총계","총취업시간", x)
+  x <- gsub("^총일한시간","총취업시간", x)
+  x <- gsub("^취업구분",
+            "총일한시간구분", x)
+  x <- gsub("^주업부업구분",
+            "총일한시간구분", x)
+  x <- gsub("^구직주요경로",
+            "구직경로", x)
+  x <- gsub("산업코드_10차",
+            "산업코드", x)
+  x <- gsub("^구직기간","구직활동기간",x)
+  x <- gsub("^구직희망여부","취업희망여부",x)
+  x <- gsub("^구직경험여부","지난1년간구직활동여부",x)
+  
+  x <- gsub("^조사대상주간주로한일","지난1주간활동상태",x)
+  x <- gsub("^조사대상기준주된활동상태","지난1주간활동상태",x)
+  
+  x <- gsub("구직활동여부4주내_취업판단","구직활동여부4주내",x)
+  x <- gsub("^사업체소재지_시도","사업체소재지",x)
+  x <- gsub("^사업체소재지코드","사업체소재지",x)
+  x <- gsub("^직업코드_7차","직업코드",x)
+  x <- gsub("^전직장그만둔기간","이직시기",x)
+  
+  x
+}
+split_df$항목명 <- replace_(split_df$항목명)
+names_list <- list()
+for(i in 1:length(split_list)){
+  names_list[[i]] <- unlist(split_list[[i]]["항목명"])
+  names_list <- lapply(names_list,replace_)
+}
+for(i in 1:length(local_list)){
+  names(local_list[[i]]) <- unlist(split_df$항목명[split_df$year==unique(unlist(local_list[[i]]["X1"]%/%100))&
+                                                  split_df$half==(unique(unlist(local_list[[i]]["X1"]%%100))%/%4)])
+}
+for(i in 1:length(local_list)){
+  local_list[[i]] <- local_list[[i]] %>% mutate(년도 = 조사년월%/%100,
+                                                  상하반기 = 조사년월%%100%/%4)
+}
+
+rm(list=ls(pattern = "local[0-9]"))
+local_df <- rbindlist(local_list,fill = TRUE)
+
+local_df$구직활동하지않은이유 <- as.numeric(local_df$구직활동하지않은이유)
+local_df$구직활동기간 <- as.numeric(local_df$구직활동기간)
+local_df$지난1주간활동상태 <- as.numeric(local_df$지난1주간활동상태)
+
+write_dta(local_df,"C:\\Users\\master\\Dropbox\\한요셉 박사님\\코어 데이터 - 경활 본조사 및 부가조사\\지역별고용조사\\데이터\\지역별고용조사13-19.dta")
+
+
+
+
+
+
+
