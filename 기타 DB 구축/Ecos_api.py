@@ -21,17 +21,20 @@ api_key="[API KEY]"
 
 
 
-
 class ecos_call():
     '''
     한국은행 데이터를 불러내기 위한 Class 구축
     api_key를 최초 input으로 받음
     ecos_call() 내 명령어 사용 순서는 아래와 같음:
-        1. ecos_tablelist()로 대분류 항목 선택
-        2. ecos_itmlist()로 세부 변수의 아이템 코드 탐색
-        3. 1번과 2번에서 얻은 정보로 작성 후 데이터 Call
+        
+    1. ecos_tablelist()로 대분류 항목 선택
+    2. ecos_itmlist()로 세부 변수의 아이템 코드 탐색
+    3. 1번과 2번에서 얻은 정보로 ecos_data_call() 작성 후 데이터 Call
+    
+    필요한 패키지들은 requests와 pandas임
     '''
     
+    # init
     def __init__(self,api_key):
         self.api_key = api_key
         
@@ -106,7 +109,10 @@ class ecos_call():
     
     
     # 한국은행 통계 조회
-    def ecos_data_call(self,start,end,stat_code=None,level=None,start_date=None,end_date=None,itm_code=None):
+    def ecos_data_call(self,start,end,stat_code=None,level=None,start_date=None,end_date=None,itm_code1=None,itm_code2=None):
+        '''
+        ECOS 통계 데이터를 조회하는 명령어로, start~itm_code1까지의 정보들을 모두 입력할 것을 권장함
+        '''
         if stat_code==None:
             raise ValueError("통계표 코드를 입력하시오")
         if level==None:
@@ -115,18 +121,31 @@ class ecos_call():
             raise ValueError("검색시작일자를 입력하시오")
         if end_date==None:
             raise ValueError("검색종료일자를 입력하시오")
+                    
         
-        
-        url = "https://ecos.bok.or.kr/api/StatisticSearch/{}/json/kr/{}/{}/{}/{}/{}/{}/{}".format(
-            self.api_key,
-            start,
-            end,
-            stat_code,
-            level,
-            start_date,
-            end_date,
-            itm_code
-            )
+        if itm_code2==None:
+            url = "https://ecos.bok.or.kr/api/StatisticSearch/{}/json/kr/{}/{}/{}/{}/{}/{}/{}".format(
+                self.api_key,
+                start,
+                end,
+                stat_code,
+                level,
+                start_date,
+                end_date,
+                itm_code1
+                )
+        else:
+            url = "https://ecos.bok.or.kr/api/StatisticSearch/{}/json/kr/{}/{}/{}/{}/{}/{}/{}/{}".format(
+                self.api_key,
+                start,
+                end,
+                stat_code,
+                level,
+                start_date,
+                end_date,
+                itm_code1,
+                itm_code2
+                )
         
         # 한국은행 DB에서 데이터 Call
         resp = requests.get(url)
