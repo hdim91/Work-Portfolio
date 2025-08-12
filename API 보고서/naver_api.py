@@ -11,8 +11,8 @@ import datetime
 import urllib.request
 import pandas as pd
 import json
-client_id = "nh_U6NYwIuU4FV8TNwei" # API 아이디
-client_secret = "7XNYDoNLpQ" # API 비밀번호
+client_id = "[API Key]" # API 아이디
+client_secret = "[API PWD]" # API 비밀번호
 # =============================================================================
 # naver_call_agegroup(client_id,client_secret,"실업","실업",365)
 # =============================================================================
@@ -99,4 +99,5 @@ def naver_call_agegroup(client_id, client_secret,keyword,keywords,days,timeunit)
         tmp.columns = ['period',age_group[i]+'남성']
         
         main = main.join(tmp.set_index('period'),on='period')
+
     return main
