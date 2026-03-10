@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고용동향 분석 파이프라인 — System Architecture v2.0</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #030812;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    color: #e0e0e0;
+    padding: 28px 20px;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  #header { text-align: center; margin-bottom: 32px; }
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg,#00D4FF22,#7B61FF22);
+    border: 1px solid #00D4FF44;
+    border-radius: 4px;
+    padding: 4px 16px;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: #00D4FF;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: clamp(17px,2.8vw,28px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg,#00D4FF,#7B61FF,#ff4488);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 7px;
+  }
+  .subtitle { color: #444; font-size: 11px; letter-spacing: 1px; }
+
+  /* ── DATE RANGE PANEL ── */
+  #date-range-panel {
+    background: #1a1400;
+    border: 1px solid #FFB80055;
+    border-left: 3px solid #FFB800;
+    border-radius: 6px;
+    padding: 16px 20px;
+    max-width: 1100px;
+    margin: 0 auto 8px;
+  }
+  .dr-title { color: #FFB800; letter-spacing: 2px; margin-bottom: 12px; font-size: 10px; }
+  .dr-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+  .dr-card {
+    flex: 1 1 200px;
+    background: #ffffff06;
+    border: 1px solid #ffffff11;
+    border-radius: 4px;
+    padding: 10px 14px;
+  }
+  .dr-card.active { background: #FFB80010; border-color: #FFB80066; }
+  .dr-card-label { color: #777; margin-bottom: 6px; font-size: 10px; letter-spacing: 1px; }
+  .dr-card-rule { color: #aaa; font-size: 11px; margin-bottom: 3px; }
+  .dr-card.active .dr-card-rule { color: #FFB800; }
+  .dr-card-range { color: #888; font-size: 12px; }
+  .dr-card.active .dr-card-range { color: #fff; font-weight: 700; }
+  .dr-card-months { color: #555; font-size: 10px; margin-top: 3px; }
+
+  /* ── UPSERT TOGGLE ── */
+  #upsert-toggle-wrap { max-width: 1100px; margin: 6px auto 6px; text-align: right; }
+  #upsert-btn {
+    background: #ffffff08;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    padding: 4px 12px;
+    color: #555;
+    font-size: 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  #upsert-btn.open { background: #00ff8818; border-color: #00ff88; color: #00ff88; }
+
+  /* ── UPSERT FLOW ── */
+  #upsert-flow {
+    display: none;
+    background: #050e0a;
+    border: 1px solid #00ff8833;
+    border-left: 3px solid #00ff88;
+    border-radius: 6px;
+    padding: 16px 20px;
+    max-width: 1100px;
+    margin: 0 auto 8px;
+  }
+  #upsert-flow.open { display: block; }
+  .uf-title { color: #00ff8877; letter-spacing: 2px; margin-bottom: 14px; font-size: 10px; }
+  .uf-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; }
+  .uf-step {
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+    line-height: 1.6;
+    min-width: 88px;
+    white-space: pre-line;
+  }
+  .uf-step .uf-icon { font-size: 14px; margin-bottom: 2px; }
+  .uf-step .uf-lbl { font-size: 10px; }
+  .uf-arrow { color: #2a2a2a; font-size: 18px; }
+  .uf-branch { color: #555; font-size: 11px; padding: 0 2px; }
+  .uf-footer {
+    margin-top: 12px; padding: 8px 12px;
+    background: #ffffff04; border-radius: 4px;
+    font-size: 10px; color: #555; line-height: 1.9;
+  }
+  .uf-footer span { color: #FFB800; }
+
+  /* ── PIPELINE LAYERS ── */
+  #pipeline { max-width: 1100px; margin: 0 auto; }
+  .layer-wrap { margin-bottom: 7px; }
+  .layer-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .layer-bar { width: 28px; height: 2px; }
+  .layer-title { font-size: 10px; letter-spacing: 3px; font-weight: 700; }
+  .layer-line { flex: 1; height: 1px; }
+  .layer-body {
+    border-left-width: 3px;
+    border-left-style: solid;
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* ── NODE CARDS ── */
+  .node-card {
+    flex: 1 1 170px;
+    max-width: 300px;
+    background: #ffffff07;
+    border-radius: 5px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  .node-title { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+  .node-sub { font-size: 10px; color: #888; margin-bottom: 7px; }
+  .node-lang {
+    display: inline-block;
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .node-detail {
+    display: none;
+    margin-top: 10px;
+    padding-top: 10px;
+    font-size: 10px;
+    color: #bbb;
+    line-height: 1.9;
+    white-space: pre-wrap;
+  }
+  .node-detail.code {
+    background: #00000040;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: 'JetBrains Mono','Courier New',monospace;
+  }
+  .node-card.open .node-detail { display: block; }
+
+  /* ── LAYER CONNECTOR ── */
+  .layer-connector {
+    display: flex; justify-content: center; padding: 4px 0;
+  }
+  .connector-inner { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .connector-line { width: 1px; height: 12px; }
+  .connector-arrow {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+  }
+
+  /* ── TECH STACK ── */
+  #tech-stack {
+    max-width: 1100px;
+    margin: 32px auto 0;
+    border-top: 1px solid #ffffff08;
+    padding-top: 24px;
+  }
+  .ts-title { font-size: 10px; letter-spacing: 3px; color: #333; margin-bottom: 14px; text-align: center; }
+  .ts-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .ts-card {
+    background: #0a0a0a; border: 1px solid #181818;
+    border-radius: 5px; padding: 10px 14px; min-width: 130px;
+  }
+  .ts-cat { font-size: 9px; letter-spacing: 2px; color: #3a3a3a; margin-bottom: 6px; }
+  .ts-item { font-size: 10px; color: #666; line-height: 1.9; }
+
+  /* ── EXECUTION FLOW ── */
+  #exec-flow {
+    max-width: 1100px; margin: 24px auto 0;
+    background: #080f18; border: 1px solid #00D4FF18;
+    border-radius: 7px; padding: 16px 20px;
+  }
+  .ef-title { font-size: 10px; letter-spacing: 3px; color: #00D4FF44; margin-bottom: 12px; }
+  .ef-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .ef-step {
+    border-radius: 4px; padding: 5px 9px;
+    font-size: 10px; text-align: center;
+    white-space: pre-line; line-height: 1.5;
+  }
+  .ef-step-label { opacity: 0.5; font-size: 9px; }
+  .ef-arrow { color: #1e1e1e; font-size: 16px; }
+
+  /* ── FOOTER ── */
+  #footer { text-align: center; margin-top: 24px; font-size: 10px; color: #1e1e1e; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="badge">SYSTEM ARCHITECTURE v2.0</div>
+  <h1>고용동향 분석 파이프라인</h1>
+  <p class="subtitle">동적 수집 범위 · BQ Upsert/Dedup · KOSIS · NAVER · BLS · Google Trends → BigQuery → R Markdown</p>
+</div>
+
+<!-- DATE RANGE PANEL -->
+<div id="date-range-panel">
+  <div class="dr-title" id="dr-title">▶ LIVE DATE RANGE PREVIEW</div>
+  <div class="dr-cards" id="dr-cards"></div>
+</div>
+
+<!-- UPSERT TOGGLE -->
+<div id="upsert-toggle-wrap">
+  <button id="upsert-btn" onclick="toggleUpsert()">▼ BQ UPSERT &amp; DEDUP FLOW</button>
+</div>
+
+<!-- UPSERT FLOW -->
+<div id="upsert-flow">
+  <div class="uf-title">▶ BQ RAW LAYER — UPSERT &amp; DEDUP FLOW</div>
+  <div class="uf-steps" id="uf-steps"></div>
+  <div class="uf-footer">
+    <span>Unique Key:</span> (source, period, variable_name, category_key)&nbsp;&nbsp;|&nbsp;&nbsp;
+    <span>중복 방어:</span> MERGE + Dedup VIEW (ROW_NUMBER=1)&nbsp;&nbsp;|&nbsp;&nbsp;
+    <span>메타:</span> ingested_at TIMESTAMP, run_id STRING UUID
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div id="pipeline"></div>
+
+<!-- TECH STACK -->
+<div id="tech-stack">
+  <div class="ts-title">TECH STACK REFERENCE</div>
+  <div class="ts-grid" id="ts-grid"></div>
+</div>
+
+<!-- EXECUTION FLOW -->
+<div id="exec-flow">
+  <div class="ef-title">MONTHLY EXECUTION FLOW</div>
+  <div class="ef-steps" id="ef-steps"></div>
+</div>
+
+<div id="footer">← CLICK ANY NODE FOR DETAILS · UPSERT FLOW 버튼으로 BQ 적재 흐름 확인 →</div>
+
+<script>
+// ──────────────────────────────────────────────
+// DATE RANGE LOGIC
+// ──────────────────────────────────────────────
+function calcDateRange(refDate) {
+  const d = refDate || new Date();
+  const day = d.getDate();
+  const yyyy = d.getFullYear();
+  const m = d.getMonth() + 1;
+
+  let endYYYY = yyyy, endM = m - 1;
+  if (endM <= 0) { endM = 12; endYYYY = yyyy - 1; }
+
+  let startYYYY, startM;
+  if (day < 15) {
+    startM = endM; startYYYY = endYYYY - 5;
+  } else {
+    startM = m; startYYYY = yyyy - 5;
+  }
+
+  const fmt = (y, mo) => y + '년 ' + String(mo).padStart(2,'0') + '월';
+  const months = (endYYYY - startYYYY) * 12 + (endM - startM) + 1;
+  return {
+    start: fmt(startYYYY, startM),
+    end: fmt(endYYYY, endM),
+    rule: day < 15 ? 'n < 15 → 전전월 start' : 'n ≥ 15 → 당월 start',
+    months: months
+  };
+}
+
+function renderDateRange() {
+  const today = new Date();
+  const range = calcDateRange(today);
+  const case1 = calcDateRange(new Date(today.getFullYear(), today.getMonth(), 10));
+  const case2 = calcDateRange(new Date(today.getFullYear(), today.getMonth(), 20));
+  const m = today.getMonth() + 1;
+
+  document.getElementById('dr-title').textContent =
+    '▶ LIVE DATE RANGE PREVIEW — 오늘: ' + today.getFullYear() + '년 ' + m + '월 ' + today.getDate() + '일 (' + range.rule + ')';
+
+  const cases = [
+    { label: '실제 적용 (오늘 = ' + today.getDate() + '일)', r: range, active: true },
+    { label: '가정: 실행일 = ' + m + '월 10일', r: case1, active: false },
+    { label: '가정: 실행일 = ' + m + '월 20일', r: case2, active: false },
+  ];
+
+  const container = document.getElementById('dr-cards');
+  container.innerHTML = cases.map(({ label, r, active }) =>
+    '<div class="dr-card' + (active ? ' active' : '') + '">' +
+      '<div class="dr-card-label">' + label + '</div>' +
+      '<div class="dr-card-rule">' + r.rule + '</div>' +
+      '<div class="dr-card-range">' + r.start + ' ~ ' + r.end + '</div>' +
+      '<div class="dr-card-months">총 ' + r.months + '개월</div>' +
+    '</div>'
+  ).join('');
+}
+
+// ──────────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────────
+const layers = [
+  {
+    id: 'datelogic', label: '00 DATE RANGE LOGIC',
+    color: '#FFB800', bg: '#1a1400',
+    nodes: [
+      {
+        id: 'datecalc', label: '수집 기간 결정 로직', sub: '실행일 기준 자동 산출', lang: 'Python / datetime', color: '#FFB800', isCode: true,
+        detail: `from datetime import date
+from dateutil.relativedelta import relativedelta
+
+today = date.today()
+n = today.day
+
+# end: 항상 전월
+end = (today.replace(day=1)
+       - relativedelta(months=1))
+
+# start: n < 15이면 end 기준 -5년
+#        n ≥ 15이면 today 기준 -5년 (당월)
+if n < 15:
+    start = end - relativedelta(years=5)
+else:
+    start = today.replace(day=1) \\
+            - relativedelta(years=5)
+
+PERIOD_START = start.strftime("%Y-%m")
+PERIOD_END   = end.strftime("%Y-%m")`
+      },
+      {
+        id: 'datebranch', label: '분기 조건 요약', sub: 'n < 15 vs n ≥ 15', lang: 'Logic', color: '#FFA500', isCode: false,
+        detail: `[ n < 15일 ]
+start = (yyyy-5)년 (m-1)월
+end   =  yyyy년   (m-1)월
+
+[ n ≥ 15일 ]
+start = (yyyy-5)년  m월
+end   =  yyyy년   (m-1)월
+
+공통: end = 항상 전월
+차이: start의 시작 월만 다름
+기간 ≈ 60개월 (5년)`
+      },
+      {
+        id: 'dateparam', label: '파라미터 전달', sub: '전 단계 API에 주입', lang: 'Python / env', color: '#FF8C00', isCode: true,
+        detail: `# Cloud Run Job 진입점
+os.environ["PERIOD_START"] = PERIOD_START
+os.environ["PERIOD_END"]   = PERIOD_END
+
+# 각 수집 함수에서 참조
+kosis_fetcher(
+  start=os.getenv("PERIOD_START"),
+  end=os.getenv("PERIOD_END"))
+
+bls_fetcher(
+  start=os.getenv("PERIOD_START"),
+  end=os.getenv("PERIOD_END"))`
+      }
+    ]
+  },
+  {
+    id: 'ingestion', label: '01 DATA INGESTION',
+    color: '#00D4FF', bg: '#001a2e',
+    nodes: [
+      {
+        id: 'kosis_emp', label: 'KOSIS — 취업자·임금·인구 통계', sub: '원계열 + 계절조정 (13종)', lang: 'Python / requests', color: '#00D4FF', isCode: false,
+        detail: `── 취업자 수 (원계열 / 계절조정 공통) ──
+raw_employed               계절조정: seasonal_employed
+  취업자 수 (전체)
+
+raw_employed_by_industry   계절조정: seasonal_employed_by_industry
+  산업별(대분류) 취업자 수
+
+raw_employed_by_work_status  계절조정: seasonal_employed_by_work_status
+  종사상지위별 취업자 수
+
+raw_employed_by_job_status   계절조정: seasonal_employed_by_job_status
+  종사자지위별 취업자 수
+
+raw_employed_by_sex        계절조정: seasonal_employed_by_sex
+  성별 취업자 수
+
+raw_employed_by_age        계절조정: seasonal_employed_by_age
+  연령별 취업자 수
+
+raw_employed_by_sex_age    계절조정: seasonal_employed_by_sex_age
+  성별×연령별 취업자 수
+
+── 고용보조지표 (원계열 / 계절조정 공통) ──
+raw_supplementary_labor_index3       계절조정: seasonal_supplementary_labor_index3
+  전체 및 연령별 고용보조지표3
+
+── 임금 통계 (원계열 / 계절조정 공통) ──
+raw_total_wage                       계절조정: seasonal_total_wage
+  전체 임금총액
+
+raw_total_wage_by_work_status        계절조정: seasonal_total_wage_by_work_status
+  종사상지위별 임금총액
+
+raw_regular_wage_and_overtime        계절조정: seasonal_regular_wage_and_overtime
+  상용근로자 정액급여 및 초과급여
+
+── 인구 통계 (원계열 / 계절조정 공통) ──
+raw_population_15plus            계절조정: seasonal_population_15plus
+  전체 15세이상 인구
+
+raw_population_15plus_by_sex_age 계절조정: seasonal_population_15plus_by_sex_age
+  성별×연령별 15세이상 인구
+
+── 공통 파라미터 ──
+수집범위: PERIOD_START ~ PERIOD_END
+adjustment_type: "raw" | "seasonal"`
+      },
+      {
+        id: 'kosis_benefit', label: 'KOSIS — 구직급여 통계', sub: '원계열 + 계절조정 (3종)', lang: 'Python / requests', color: '#38bdf8', isCode: false,
+        detail: `── 수집 변수 (원계열 / 계절조정 공통) ──
+raw_job_seeker_applicants  계절조정: seasonal_job_seeker_applicants
+  구직급여 신청자 수
+
+raw_job_seeker_recipients  계절조정: seasonal_job_seeker_recipients
+  구직급여 수급자 수
+
+raw_job_seeker_payment     계절조정: seasonal_job_seeker_payment
+  구직급여 지급액
+
+── 공통 파라미터 ──
+수집범위: PERIOD_START ~ PERIOD_END
+adjustment_type: "raw" | "seasonal"`
+      },
+      {
+        id: 'naver_datalab', label: 'NAVER DataLab — 검색어 트렌드', sub: '연령×성별 검색 상대빈도 (3 키워드)', lang: 'Python / requests', color: '#00ff88', isCode: false,
+        detail: `── API ──
+POST https://openapi.naver.com/v1/datalab/search
+헤더: X-Naver-Client-Id / Secret
+
+── 수집 키워드 (3종) ──
+search_trend_unemployment   '실업'
+search_trend_recruitment    '채용'
+search_trend_job_change     '이직'
+
+── 분류 차원 ──
+ages:   1(0-12) / 2(13-18) / 3(19-24)
+        4(25-29) / 5(30-39) / 6(40-49)
+        7(50-59) / 8(60+)
+gender: m(남성) / f(여성)
+
+── 변수 네이밍 규칙 ──
+search_trend_{keyword}_{gender}_{agegroup}
+예) search_trend_unemployment_m_30s
+    search_trend_recruitment_f_20s
+
+── 파라미터 ──
+startDate: PERIOD_START
+endDate:   PERIOD_END
+timeUnit:  "month"
+수집범위:  PERIOD_START ~ PERIOD_END`
+      },
+      {
+        id: 'naver_jobpost', label: 'NAVER 검색 API — 채용공고', sub: '직종별 채용공고 건수 추이', lang: 'Python / requests', color: '#00dd66', isCode: false,
+        detail: `── API ──
+GET https://openapi.naver.com/v1/search/news.json
+
+── 수집 변수 ──
+job_posting_count_total         전체 채용공고 수
+job_posting_count_it            IT·개발 직종
+job_posting_count_manufacturing 제조·생산 직종
+job_posting_count_service       서비스·판매 직종
+job_posting_count_finance       금융·보험 직종
+
+── 산출 방법 ──
+키워드별 월간 검색 결과 total 집계
+→ 상대 공고량 지수로 정규화
+→ 전월 대비 증감률 산출
+
+수집범위: PERIOD_START ~ PERIOD_END`
+      },
+      {
+        id: 'naver_news', label: 'NAVER 검색 API — 뉴스 트렌드', sub: '고용 뉴스 건수 + 감성지수', lang: 'Python / KoNLPy', color: '#00bb44', isCode: false,
+        detail: `── API ──
+GET https://openapi.naver.com/v1/search/news.json
+
+── 수집 변수 ──
+news_count_employment      고용 관련 뉴스 건수
+news_count_unemployment    실업 관련 뉴스 건수
+news_count_layoff          해고·감원 관련 뉴스 건수
+news_sentiment_employment  고용 뉴스 감성 지수
+
+── 감성분석 파이프라인 ──
+뉴스 제목+본문 수집
+→ KoBERT 감성 분류
+  (긍정:1 / 중립:0 / 부정:-1)
+→ 월간 평균 감성 지수 산출
+  news_sentiment_score: -1.0 ~ 1.0
+
+수집범위: PERIOD_START ~ PERIOD_END`
+      },
+      {
+        id: 'bls', label: 'BLS — 미국 통계', sub: '원계열 + 계절조정 (4개 조사)', lang: 'Python / requests', color: '#ff6b35', isCode: false,
+        detail: `── ① 미국 고용자 수 (Total Nonfarm) ──
+출처: CES (National Employment, Hours, and Earnings)
+
+raw_us_nonfarm_employment          계절조정: seasonal_us_nonfarm_employment
+  미국 고용자 수 전체 (Total Nonfarm)
+
+raw_us_nonfarm_employment_by_industry  계절조정: seasonal_us_nonfarm_employment_by_industry
+  산업별 고용자 수 (NAICS 대분류)
+  Mining / Construction / Manufacturing
+  Trade,Transport / Information / Financial
+  Professional / Education / Leisure / Government
+
+Series: 계절조정 CES0000000001 / 원계열 CEU0000000001
+        산업별 CES{industry_code}0000001
+
+── ② 미국 시간당 임금 (Total Nonfarm Private) ──
+출처: CES (National Employment, Hours, and Earnings)
+
+raw_us_hourly_wage                 계절조정: seasonal_us_hourly_wage
+  시간당 평균임금 (Total Private)
+
+raw_us_weekly_hours                계절조정: seasonal_us_weekly_hours
+  주당 평균 근로시간 (Total Private)
+
+raw_us_weekly_earnings             계절조정: seasonal_us_weekly_earnings
+  주당 평균 임금총액 (Total Private)
+
+Series: 계절조정 CES0500000008 / 원계열 CEU0500000008
+        주당시간 CES0500000007 / 주당임금 CES0500000011
+
+── ③ 미국 연령별 고용자 수 (Not Seasonally Adjusted) ──
+출처: CPS (Labor Force Statistics from the Current Population Survey)
+
+raw_us_employment_by_age           계절조정: seasonal_us_employment_by_age
+  연령별 고용자 수 (16-19 / 20-24 / 25-34 / 35-44 / 45-54 / 55-64 / 65+)
+
+raw_us_unemployment_rate_by_age    계절조정: seasonal_us_unemployment_rate_by_age
+  연령별 실업률
+
+Series: 원계열 LNU02000012 (16-19) / LNU02000036 (20-24) / LNU02000089 (25-34) 외
+        주의: 계절조정은 일부 연령대만 제공
+
+── ④ 미국 채용공고 및 퇴직 ──
+출처: JOLTS (Job Openings and Labor Turnover Survey)
+
+raw_us_job_openings                계절조정: seasonal_us_job_openings
+  채용 공고 수 (Job Openings)
+
+raw_us_hires                       계절조정: seasonal_us_hires
+  신규 채용 수 (Hires)
+
+raw_us_total_separations           계절조정: seasonal_us_total_separations
+  전체 퇴직·이직 수 (Total Separations)
+
+raw_us_quits                       계절조정: seasonal_us_quits
+  자발적 퇴직 수 (Quits)
+
+raw_us_layoffs_discharges          계절조정: seasonal_us_layoffs_discharges
+  해고·강제퇴직 수 (Layoffs & Discharges)
+
+Series: JTS000000000000000JOL (채용공고) / JTS000000000000000HIL (신규채용)
+        JTS000000000000000TSL (퇴직) / 원계열 접두사 JTU
+
+── 공통 파라미터 ──
+수집범위: PERIOD_START ~ PERIOD_END
+adjustment_type: "raw" | "seasonal"`
+      },
+      {
+        id: 'gtrend', label: 'Google Trends', sub: '취업 관련 검색량', lang: 'Python / pytrends', color: '#ffd700', isCode: false,
+        detail: `키워드: 취업, 이직, 채용
+timeframe: PERIOD_START PERIOD_END
+지역: KR
+지역별 관심도 / 계절성 분석`
+      }
+    ]
+  },
+  {
+    id: 'pipeline', label: '02 PIPELINE & TRANSFORM',
+    color: '#7B61FF', bg: '#120d2e',
+    nodes: [
+      {
+        id: 'validate', label: 'Data Validation', sub: '품질 검증 & 정제', lang: 'Python / Pydantic', color: '#7B61FF', isCode: false,
+        detail: `결측값 처리
+데이터 타입 정규화
+period 형식 통일: YYYY-MM
+Great Expectations`
+      },
+      {
+        id: 'transform', label: 'Transform Layer', sub: '지표 계산 & 가공', lang: 'Python / Pandas', color: '#7B61FF', isCode: false,
+        detail: `YoY / MoM 증감률
+전년동월 비교치 (YoY Same-Month)
+  value_t - value_(t-12)
+  (value_t - value_(t-12)) / value_(t-12) × 100
+계절조정 (X-13ARIMA)
+이동평균 (3/6/12M)
+고용률 = 취업자/15세이상인구`
+      },
+      {
+        id: 'scheduler', label: 'Orchestration', sub: '자동화 스케줄링', lang: 'Cloud Scheduler', color: '#a855f7', isCode: false,
+        detail: `매월 1일 00:00 KST 트리거
+→ Step 00: 날짜 범위 계산
+→ API 수집 → 검증 → BQ 적재
+실패 시 Slack 알림
+재시도 3회 (exponential backoff)`
+      }
+    ]
+  },
+  {
+    id: 'storage', label: '03 BIGQUERY RAW LAYER — UPSERT & DEDUP',
+    color: '#00ff88', bg: '#001a12',
+    nodes: [
+      {
+        id: 'upsert', label: 'Unique 체크 & Upsert', sub: 'MERGE로 중복 없는 증분 적재', lang: 'BigQuery MERGE', color: '#00ff88', isCode: true,
+        detail: `-- Staging → Raw MERGE
+MERGE \`proj.kosis_stats.employment_raw\` AS T
+USING \`proj.kosis_stats.employment_stg\` AS S
+  ON  T.source        = S.source
+  AND T.period        = S.period
+  AND T.variable_name = S.variable_name
+  AND T.category_key  = S.category_key
+WHEN MATCHED THEN
+  UPDATE SET value=S.value,
+             ingested_at=S.ingested_at,
+             run_id=S.run_id,
+             adjustment_type=S.adjustment_type
+WHEN NOT MATCHED THEN
+  INSERT (source,period,variable_name,
+          category_key,value,adjustment_type,
+          ingested_at,run_id)
+  VALUES (S.source,S.period,S.variable_name,
+          S.category_key,S.value,S.adjustment_type,
+          S.ingested_at,S.run_id)`
+      },
+      {
+        id: 'rawschema', label: 'Raw Table 스키마', sub: 'Unique Key 설계', lang: 'BigQuery DDL', color: '#00cc66', isCode: true,
+        detail: `-- Unique Key (논리적 복합키)
+source         STRING  -- 'kosis_emp'|'kosis_benefit'
+                       -- 'naver_datalab'|'naver_jobpost'|'naver_news'
+                       -- 'bls'
+                       -- 'google_trends'
+period         STRING  -- 'YYYY-MM'  ← PARTITION 기준
+variable_name  STRING  -- raw_* / seasonal_* 변수명
+  예) raw_employed
+      seasonal_employed_by_sex_age
+      raw_supplementary_labor_index3
+      raw_total_wage
+      seasonal_total_wage_by_work_status
+      raw_regular_wage_and_overtime
+      raw_job_seeker_applicants
+      raw_us_nonfarm_employment
+      seasonal_us_hourly_wage
+      raw_us_employment_by_age
+      seasonal_us_job_openings
+      raw_us_quits
+      raw_population_15plus
+      seasonal_population_15plus_by_sex_age
+      search_trend_unemployment_m_30s
+category_key   STRING  -- 산업·성별·연령 등 분류 복합키
+
+-- 메타 컬럼
+ingested_at    TIMESTAMP  -- 적재 시각
+run_id         STRING     -- 실행 UUID (추적용)
+adjustment_type STRING    -- 'raw' | 'seasonal' | 'index'
+
+-- 파티션 / 클러스터
+PARTITION BY DATE(PARSE_DATE('%Y-%m', period))
+CLUSTER BY source, variable_name`
+      },
+      {
+        id: 'dedupview', label: 'Dedup View', sub: '최신 레코드만 노출', lang: 'BigQuery SQL', color: '#00aa55', isCode: true,
+        detail: `-- Raw 중복 제거 View
+-- (MERGE 이후에도 재실행 방어용)
+CREATE OR REPLACE VIEW
+  kosis_stats.employment_raw_dedup AS
+SELECT * EXCEPT(rn)
+FROM (
+  SELECT *,
+    ROW_NUMBER() OVER (
+      PARTITION BY
+        source, period,
+        variable_name, category_key
+      ORDER BY ingested_at DESC
+    ) AS rn
+  FROM kosis_stats.employment_raw
+)
+WHERE rn = 1
+
+-- variable_name 예시
+-- raw_employed
+-- seasonal_employed_by_sex_age
+-- search_trend_recruitment_f_20s
+-- raw_job_seeker_payment`
+      }
+    ]
+  },
+  {
+    id: 'mart', label: '04 MART & FEATURE STORE',
+    color: '#4dd0e1', bg: '#00131a',
+    nodes: [
+      {
+        id: 'martlayer', label: 'Mart Layer', sub: '분석용 집계 테이블', lang: 'BigQuery', color: '#4dd0e1', isCode: false,
+        detail: `── 취업자 통계 Mart ──
+employment_by_industry
+employment_by_work_status
+employment_by_job_status
+employment_by_sex
+employment_by_age
+employment_by_sex_age
+  PARTITION BY: period_month
+  CLUSTER BY: adjustment_type, category_key
+
+── 인구 통계 Mart ──
+population_15plus_monthly
+  (population_15plus / population_15plus_by_sex_age)
+  PARTITION BY: period_month
+  CLUSTER BY: adjustment_type, category_sex, category_age
+
+── 고용보조지표 Mart ──
+supplementary_labor_index_monthly
+  (supplementary_labor_index3)
+  PARTITION BY: period_month
+  CLUSTER BY: adjustment_type, category_age
+
+── 임금 통계 Mart ──
+wage_monthly
+  (total_wage / total_wage_by_work_status)
+  (regular_wage / overtime_wage)
+  PARTITION BY: period_month
+  CLUSTER BY: adjustment_type, category_work_status
+
+── 구직급여 통계 Mart ──
+job_seeker_benefits_monthly
+  (applicants / recipients / payment)
+  PARTITION BY: period_month
+
+── 검색트렌드 Mart ──
+search_trend_monthly
+  (unemployment/recruitment/job_change)
+  (gender × age_group 분류)
+
+── 구인·뉴스 Mart ──
+job_posting_news_monthly
+  (job_posting_count_* / news_count_* / news_sentiment_*)
+
+── BLS 통계 Mart ──
+us_nonfarm_employment_monthly
+  (nonfarm_employment / nonfarm_employment_by_industry)
+  CLUSTER BY: adjustment_type, industry_code
+
+us_wage_hours_monthly
+  (hourly_wage / weekly_hours / weekly_earnings)
+  CLUSTER BY: adjustment_type
+
+us_employment_by_age_monthly
+  (employment_by_age / unemployment_rate_by_age)
+  CLUSTER BY: adjustment_type, age_group
+
+us_jolts_monthly
+  (job_openings / hires / separations / quits / layoffs)
+  CLUSTER BY: adjustment_type
+
+── 통합 지표 Mart ──
+monthly_indicators_integrated
+  → Dedup View 기반
+  → KOSIS + BLS + NAVER + Google Trends`
+      },
+      {
+        id: 'feature', label: 'Feature Store', sub: 'ML / 예측 피처', lang: 'BigQuery ML', color: '#26c6da', isCode: false,
+        detail: `시계열 피처 엔지니어링
+Lag features (1/3/6/12M)
+계절 더미 변수
+ARIMA+ 예측 모델
+학습 기간: 수집 범위 전체 (5년)`
+      }
+    ]
+  },
+  {
+    id: 'analysis', label: '05 ANALYSIS LAYER',
+    color: '#ff6b35', bg: '#1a0d00',
+    nodes: [
+      {
+        id: 'eda', label: 'EDA & 시각화', sub: '탐색적 데이터 분석', lang: 'R / ggplot2', color: '#ff6b35', isCode: false,
+        detail: `시계열 분해 (STL)
+상관관계 히트맵
+연령·성별 분포 차트
+ggplot2 + patchwork
+5년 전체 구간 시각화`
+      },
+      {
+        id: 'stat', label: '통계 분석', sub: '가설검정 & 추정', lang: 'R / stats', color: '#ff8c42', isCode: false,
+        detail: `단위근 검정 (ADF)
+Granger 인과관계
+구조변화점 탐지
+breakpoints (strucchange)`
+      },
+      {
+        id: 'ml', label: '예측 모델', sub: '고용 선행지표 예측', lang: 'R / forecast + BQ ML', color: '#ffaa00', isCode: false,
+        detail: `ARIMA / ETS 모델
+Prophet (seasonality)
+BigQuery ML ARIMA+
+3개월 선행 예측
+학습: 수집 범위 전체`
+      },
+      {
+        id: 'sentiment', label: '감성 분석', sub: '뉴스 고용심리 지수', lang: 'Python / KoNLPy', color: '#ffd700', isCode: false,
+        detail: `naver_news 수집 데이터 기반
+KoBERT 감성 분류 파이프라인
+  news_sentiment_score: -1.0~1.0
+월간 고용심리지수 산출
+DataLab 트렌드와 교차 분석`
+      }
+    ]
+  },
+  {
+    id: 'report', label: '06 RMARKDOWN REPORT',
+    color: '#ff4488', bg: '#1a0014',
+    nodes: [
+      {
+        id: 'params', label: 'Parameterized Rmd', sub: '동적 파라미터 보고서', lang: 'R / knitr', color: '#ff4488', isCode: true,
+        detail: `params:
+  run_date:     !r Sys.Date()
+  period_start: auto  # env에서 주입
+  period_end:   auto
+
+bigrquery로 BQ 연결
+수집 범위 자동 반영
+monthly_report.Rmd`
+      },
+      {
+        id: 'sections', label: '보고서 섹션 구성', sub: '5개 챕터 구조', lang: 'R Markdown', color: '#cc3366', isCode: false,
+        detail: `1. 종합 고용 현황
+2. 연령·성별 분석
+3. 한·미 비교
+4. 검색·채용 트렌드
+5. 3개월 선행 예측`
+      },
+      {
+        id: 'output', label: '멀티 포맷 출력', sub: '자동 배포', lang: 'R / rmarkdown', color: '#aa2255', isCode: false,
+        detail: `HTML (flexdashboard)
+PDF (LaTeX)
+Word (officer)
+GCS 자동 업로드`
+      }
+    ]
+  }
+];
+
+const techStack = [
+  { cat: '날짜 로직', items: ['Python datetime', 'dateutil', 'relativedelta', 'env inject'] },
+  { cat: '수집', items: ['Python 3.11', 'requests', 'pytrends', 'schedule'] },
+  { cat: '검증', items: ['Pydantic v2', 'Great Expectations', 'pandas-profiling'] },
+  { cat: 'BQ 적재', items: ['MERGE (Upsert)', 'ROW_NUMBER Dedup', 'ingested_at', 'run_id UUID'] },
+  { cat: '분석', items: ['R 4.3+', 'ggplot2', 'forecast', 'Prophet'] },
+  { cat: '보고서', items: ['R Markdown', 'knitr', 'flexdashboard', 'officer'] },
+  { cat: '운영', items: ['Cloud Run', 'Cloud Scheduler', 'Cloud Storage', 'Slack Alert'] }
+];
+
+const execSteps = [
+  { step: 'D-0 00:00', label: '날짜 범위\n계산', color: '#FFB800' },
+  { step: 'D-0', label: 'API 수집', color: '#00D4FF' },
+  { step: 'D-0', label: '검증·변환', color: '#7B61FF' },
+  { step: 'D-0', label: 'BQ MERGE\nUpsert', color: '#00ff88' },
+  { step: 'D-0', label: 'Dedup\nVIEW', color: '#4dd0e1' },
+  { step: 'D+1', label: 'R 분석', color: '#ff6b35' },
+  { step: 'D+1', label: 'Rmd\nRender', color: '#ff4488' },
+  { step: 'D+1', label: 'GCS\n업로드', color: '#ffd700' }
+];
+
+const upsertSteps = [
+  { icon: '⬇', label: 'API 수집\n데이터', color: '#00D4FF' },
+  { icon: '📋', label: 'Staging\nTable', color: '#7B61FF' },
+  { icon: '⚡', label: 'MERGE INTO\nraw_table\nON UK', color: '#FFB800', wide: true },
+  { icon: '✓', label: 'MATCHED\n→ UPDATE\n최신값 갱신', color: '#00ff88' },
+  { icon: '+', label: 'NOT MATCHED\n→ INSERT\n신규 적재', color: '#66ff99' },
+  { icon: '🔍', label: 'Dedup VIEW\nROW_NUMBER=1', color: '#4dd0e1' },
+  { icon: '✅', label: 'Mart Layer\n분석 준비', color: '#ff4488' }
+];
+
+// ──────────────────────────────────────────────
+// RENDER
+// ──────────────────────────────────────────────
+let activeNode = null;
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function renderUpsertFlow() {
+  const container = document.getElementById('uf-steps');
+  let html = '';
+  upsertSteps.forEach((s, i) => {
+    html += `<div style="display:flex;align-items:center;gap:6px;">
+      <div class="uf-step" style="background:${hexAlpha(s.color,0.08)};border:1px solid ${hexAlpha(s.color,0.33)};color:${s.color};min-width:${s.wide?'120px':'88px'}">
+        <div class="uf-icon">${s.icon}</div>
+        <div class="uf-lbl">${s.label.replace(/\n/g,'<br>')}</div>
+      </div>`;
+    if (i < upsertSteps.length - 1 && i !== 2) {
+      html += `<span class="uf-arrow">→</span>`;
+    }
+    if (i === 2) {
+      html += `<span class="uf-branch">↙↘</span>`;
+    }
+    html += `</div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderPipeline() {
+  const container = document.getElementById('pipeline');
+  let html = '';
+
+  layers.forEach((layer, li) => {
+    html += `<div class="layer-wrap">
+      <div class="layer-header">
+        <div class="layer-bar" style="background:${layer.color};box-shadow:0 0 8px ${layer.color}"></div>
+        <span class="layer-title" style="color:${layer.color}">${layer.label}</span>
+        <div class="layer-line" style="background:${hexAlpha(layer.color,0.1)}"></div>
+      </div>
+      <div class="layer-body" style="background:${layer.bg};border:1px solid ${hexAlpha(layer.color,0.16)};border-left-color:${layer.color}">`;
+
+    layer.nodes.forEach(node => {
+      html += `<div class="node-card" id="node-${node.id}" onclick="toggleNode('${node.id}')"
+          style="border:1px solid ${hexAlpha(node.color,0.2)}">
+        <div class="node-title" style="color:${node.color}">${node.label}</div>
+        <div class="node-sub">${node.sub}</div>
+        <div class="node-lang" style="background:${hexAlpha(node.color,0.1)};border:1px solid ${hexAlpha(node.color,0.27)};color:${node.color}">${node.lang}</div>
+        <div class="node-detail ${node.isCode ? 'code' : ''}" id="detail-${node.id}"
+          style="border-top:1px solid ${hexAlpha(node.color,0.16)}">${escapeHtml(node.detail)}</div>
+      </div>`;
+    });
+
+    html += `</div>`;
+
+    if (li < layers.length - 1) {
+      const nextColor = layers[li+1].color;
+      html += `<div class="layer-connector">
+        <div class="connector-inner">
+          <div class="connector-line" style="background:linear-gradient(${layer.color},${nextColor})"></div>
+          <div class="connector-arrow" style="border-top:6px solid ${nextColor}"></div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function renderTechStack() {
+  const container = document.getElementById('ts-grid');
+  container.innerHTML = techStack.map(s =>
+    `<div class="ts-card">
+      <div class="ts-cat">${s.cat.toUpperCase()}</div>
+      ${s.items.map(item => `<div class="ts-item">› ${item}</div>`).join('')}
+    </div>`
+  ).join('');
+}
+
+function renderExecFlow() {
+  const container = document.getElementById('ef-steps');
+  container.innerHTML = execSteps.map((f, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;">
+      <div class="ef-step" style="background:${hexAlpha(f.color,0.08)};border:1px solid ${hexAlpha(f.color,0.27)};color:${f.color}">
+        <div class="ef-step-label">${f.step}</div>
+        ${f.label.replace(/\n/g,'<br>')}
+      </div>
+      ${i < execSteps.length - 1 ? '<span class="ef-arrow">→</span>' : ''}
+    </div>`
+  ).join('');
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function toggleNode(id) {
+  const card = document.getElementById('node-' + id);
+  const detail = document.getElementById('detail-' + id);
+  const node = layers.flatMap(l => l.nodes).find(n => n.id === id);
+
+  if (activeNode === id) {
+    // close
+    card.classList.remove('open');
+    card.style.border = '1px solid ' + hexAlpha(node.color, 0.2);
+    card.style.background = '#ffffff07';
+    card.style.boxShadow = 'none';
+    activeNode = null;
+  } else {
+    // close previous
+    if (activeNode) {
+      const prevCard = document.getElementById('node-' + activeNode);
+      const prevNode = layers.flatMap(l => l.nodes).find(n => n.id === activeNode);
+      if (prevCard && prevNode) {
+        prevCard.classList.remove('open');
+        prevCard.style.border = '1px solid ' + hexAlpha(prevNode.color, 0.2);
+        prevCard.style.background = '#ffffff07';
+        prevCard.style.boxShadow = 'none';
+      }
+    }
+    // open new
+    card.classList.add('open');
+    card.style.border = '1px solid ' + node.color;
+    card.style.background = hexAlpha(node.color, 0.07);
+    card.style.boxShadow = '0 0 14px ' + hexAlpha(node.color, 0.16);
+    activeNode = id;
+  }
+}
+
+function toggleUpsert() {
+  const flow = document.getElementById('upsert-flow');
+  const btn = document.getElementById('upsert-btn');
+  const isOpen = flow.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
+  btn.textContent = (isOpen ? '▲' : '▼') + ' BQ UPSERT & DEDUP FLOW';
+}
+
+// ── INIT ──
+renderDateRange();
+renderUpsertFlow();
+renderPipeline();
+renderTechStack();
+renderExecFlow();
+</script>
+</body>
+</html>
